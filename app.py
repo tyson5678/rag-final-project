@@ -94,9 +94,9 @@ with st.sidebar:
                     for doc in docs:
                         doc.metadata["source_filename"] = file_name
                     
-                    # 使用固定的最佳參數 (Chunk=500)，讓介面更乾淨
+                    # 使用固定的最佳參數 (Chunk=100)，讓介面更乾淨
                     text_splitter = RecursiveCharacterTextSplitter(
-                        chunk_size=500, 
+                        chunk_size=100, 
                         chunk_overlap=50,
                         separators=["\n\n", "\n", "。", "！", "？", " ", ""]
                     )
