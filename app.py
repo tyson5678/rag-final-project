@@ -2,8 +2,9 @@ import streamlit as st
 import os
 import sys
 import tempfile
+import uuid # 🌟 新增：用來生成絕對不重複的 ID
 
-# ================= 1. 雲端資料庫修正 (保持) =================
+# ================= 1. 雲端資料庫修正 =================
 try:
     __import__('pysqlite3')
     import sys
@@ -11,17 +12,16 @@ try:
 except ImportError:
     pass
 
-# ================= 2. 頁面質感設定 =================
+# ================= 2. 頁面設定 =================
 st.set_page_config(
-    page_title="AI 知識庫助手", 
-    page_icon="📑", 
+    page_title="AI 深度知識庫", 
+    page_icon="🧠", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# 標題設計：簡約有力
-st.title("📑 文件問答助手")
-st.markdown("##### 支援 PDF 與 Word · 智慧檢索 · 精準回答")
+st.title("🧠 專屬深度文件助手")
+st.caption("🚀 支援 PDF/Word · 核彈級重置修復版")
 
 # ================= 3. 安全載入套件 =================
 try:
@@ -31,7 +31,6 @@ try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_huggingface import HuggingFaceEmbeddings
     from langchain_chroma import Chroma
-    # 嘗試匯入 Chain
     try:
         from langchain.chains import create_retrieval_chain
         from langchain.chains.combine_documents import create_stuff_documents_chain
@@ -43,7 +42,6 @@ except ImportError as e:
     st.error(f"❌ 系統啟動失敗！原因: {e}")
     st.stop()
 
-# 消除警告
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # ================= 4. API Key =================
@@ -52,7 +50,11 @@ try:
 except:
     GROQ_API_KEY = "請填入Key"
 
-# ================= 5. 核心邏輯 =================
+# ================= 5. 核心邏輯 (核彈重置機制) =================
+
+# 初始化 unique_id (這是控制上傳元件的靈魂)
+if "uploader_id" not in st.session_state:
+    st.session_state.uploader_id = str(uuid.uuid4())
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -60,18 +62,27 @@ if "messages" not in st.session_state:
 if "vector_db" not in st.session_state:
     st.session_state.vector_db = None
 
+def nuke_reset():
+    """核彈級重置：直接換一個新的 ID"""
+    st.session_state.messages = []
+    st.session_state.vector_db = None
+    # 產生一個全新的亂數 ID，這會強制 Streamlit 銷毀舊的上傳框
+    st.session_state.uploader_id = str(uuid.uuid4()) 
+
 with st.sidebar:
     st.header("🗂️ 資料上傳")
     
-    # 簡約的上傳區，但支援兩種格式
+    # 🌟 重點：key 使用隨機生成的 uploader_id
     uploaded_files = st.file_uploader(
         "上傳文件 (PDF / Word)", 
         type=["pdf", "docx"], 
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key=st.session_state.uploader_id 
     )
     
+    # 處理上傳
     if uploaded_files and st.session_state.vector_db is None:
-        with st.spinner("✨ AI 正在分析文件中..."):
+        with st.spinner("🧠 AI 正在進行深度分析..."):
             try:
                 all_splits = []
                 for uploaded_file in uploaded_files:
@@ -82,7 +93,6 @@ with st.sidebar:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_path = tmp_file.name
 
-                    # 智慧判斷讀取器
                     if file_ext == ".pdf":
                         loader = PyPDFLoader(tmp_path)
                     elif file_ext == ".docx":
@@ -94,10 +104,9 @@ with st.sidebar:
                     for doc in docs:
                         doc.metadata["source_filename"] = file_name
                     
-                    # 使用固定的最佳參數 (Chunk=100)，讓介面更乾淨
                     text_splitter = RecursiveCharacterTextSplitter(
-                        chunk_size=800,   # 改大一點，讓上下文更連貫
-                        chunk_overlap=150, # 重疊部分也加大
+                        chunk_size=800, 
+                        chunk_overlap=150,
                         separators=["\n\n", "\n", "。", "！", "？", " ", ""]
                     )
                     splits = text_splitter.split_documents(docs)
@@ -108,36 +117,34 @@ with st.sidebar:
                     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
                     vector_db = Chroma.from_documents(documents=all_splits, embedding=embeddings)
                     st.session_state.vector_db = vector_db
-                    st.toast(f"✅ 已處理 {len(uploaded_files)} 份文件", icon="🎉")
+                    st.toast(f"✅ 深度處理完成！", icon="🧠")
                 else:
                     st.warning("⚠️ 檔案內容為空")
             except Exception as e:
                 st.error(f"❌ 錯誤: {e}")
 
     st.divider()
-    st.header("⚙️ 參數設定")
+    st.header("⚙️ 參數")
     
-    # 只保留這兩個最重要的滑桿
-    temperature = st.slider("temperature（模型創意度）", 0.0, 1.0, 0.1, 0.1)
-    k_value = st.slider("top-k (參考段落數)", min_value=2, max_value=20, value=8, help="設越高，AI 讀的資料越多，回答越詳細，但速度會稍慢。")
+    temperature = st.slider("模型創意度", 0.0, 1.0, 0.1, 0.1)
+    k_value = st.slider("閱讀廣度", 2, 20, 8)
 
-    st.markdown("") # 加一點留白
+    st.markdown("")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("🗑️ 清空對話", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
     with col2:
-        if st.button("🔄 重置文件", use_container_width=True):
-            st.session_state.messages = []
-            st.session_state.vector_db = None
-            st.rerun()
+        # 🌟 修改按鈕行為：使用 on_click 回調
+        if st.button("🔄 強制重置", type="primary", use_container_width=True, on_click=nuke_reset):
+            # 這裡不需要做什麼，因為 on_click 已經處理了狀態，且 Streamlit 會自動 rerun
+            pass
 
 # ================= 聊天介面 =================
 
-# 顯示歡迎訊息 (如果沒訊息時)
 if not st.session_state.messages:
-    st.info("👋 嗨！請在左側上傳文件，然後問我任何問題。")
+    st.info("👋 請上傳文件開始使用。")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -147,31 +154,19 @@ if prompt := st.chat_input("請輸入問題..."):
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
+    # 檢查是否有 vector_db
     if st.session_state.vector_db:
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
-            # message_placeholder.markdown("Thinking...") # 讓畫面更乾淨，不顯示 Thinking 文字
-            
             try:
                 llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=temperature)
                 
-                # 提示詞優化：極致詳細版
                 qa_prompt = ChatPromptTemplate.from_template("""
                 你是一個高階學術研究員。請根據以下【上下文】回答問題。
-                
-                【回答策略】：
-                1. **拒絕籠統**：不要只給摘要，請提取上下文中的每一個細節、數據、日期和專有名詞。
-                2. **完整性**：如果上下文提到多個觀點，請全部列出，不要遺漏。
-                3. **結構化**：使用條列式或表格呈現複雜資訊。
-                4. **引用**：在回答中適當引用原文的關鍵句。
-                5. 若無相關資訊，請誠實回答「文件中未提及」。
-                6. 請用台灣繁體中文回答。
-                
-                【上下文】:
-                {context}
-                
-                【問題】:
-                {input}
+                1. 若無相關資訊，請誠實回答「文件中未提及」。
+                2. 請用台灣繁體中文回答。
+                【上下文】:{context}
+                【問題】:{input}
                 """)
 
                 retriever = st.session_state.vector_db.as_retriever(search_kwargs={"k": k_value})
@@ -184,16 +179,15 @@ if prompt := st.chat_input("請輸入問題..."):
                 message_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-                # 引用來源改成簡潔的灰色小字
-                with st.expander("參考來源 (Source)"):
+                with st.expander("📚 參考來源"):
                     for i, doc in enumerate(response['context']):
-                        st.caption(f"📄 **{doc.metadata.get('source_filename')}** (Page {doc.metadata.get('page',0)+1})")
+                        st.caption(f"📄 **{doc.metadata.get('source_filename')}** (p.{doc.metadata.get('page',0)+1})")
                         st.text(doc.page_content[:100] + "...")
                         st.divider()
 
             except Exception as e:
                 st.error(f"❌ 錯誤: {e}")
-                if "401" in str(e):
-                    st.warning("API Key 異常，請檢查 Secrets。")
     else:
-        st.toast("請先上傳文件喔！", icon="⚠️")
+        # 如果資料庫是空的，直接拒絕回答，避免 AI 用自己的幻覺回答
+        with st.chat_message("assistant"):
+            st.warning("⚠️ 請先上傳文件，我才能回答問題喔！(若已重置，請重新上傳)")
