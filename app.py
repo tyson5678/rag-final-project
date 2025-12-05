@@ -114,7 +114,11 @@ with st.sidebar:
                     os.remove(tmp_path)
 
                 if all_splits:
-                    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+                    # 🌟 修正點在這裡：強制指定 device 為 cpu
+                    embeddings = HuggingFaceEmbeddings(
+                        model_name="sentence-transformers/all-MiniLM-L6-v2",
+                        model_kwargs={'device': 'cpu'}
+                    )
                     vector_db = Chroma.from_documents(documents=all_splits, embedding=embeddings)
                     st.session_state.vector_db = vector_db
                     st.toast(f"✅ 深度處理完成！", icon="🧠")
