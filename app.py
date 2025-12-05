@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-# ================= 2. 頁面質感設定 =================
+# ================= 2. 頁面設定 =================
 st.set_page_config(
     page_title="AI 深度知識庫", 
     page_icon="🧠", 
@@ -52,6 +52,7 @@ except:
 
 # ================= 5. 核心邏輯 =================
 
+# 初始化變數
 if "uploader_id" not in st.session_state:
     st.session_state.uploader_id = str(uuid.uuid4())
 if "messages" not in st.session_state:
@@ -84,7 +85,7 @@ with st.sidebar:
     if uploaded_files:
         # 如果檔案清單跟上次不一樣，或者是第一次上傳
         if current_files_sig != st.session_state.processed_files:
-            with st.spinner("🧠 偵測到新文件，AI 正在進行深度分析..."):
+            with st.spinner("🧠 偵測到文件變動，正在重新建立全新資料庫..."):
                 try:
                     all_splits = []
                     for uploaded_file in uploaded_files:
@@ -116,16 +117,25 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 錯誤修復：強制使用 CPU
+                        # 🌟 錯誤修正點 1：強制使用 CPU 避免 Meta Tensor 錯誤
                         embeddings = HuggingFaceEmbeddings(
                             model_name="sentence-transformers/all-MiniLM-L6-v2",
                             model_kwargs={'device': 'cpu'}
                         )
-                        vector_db = Chroma.from_documents(documents=all_splits, embedding=embeddings)
+                        
+                        # 🌟 重大修正點 2：給資料庫一個隨機名稱，保證隔離！
+                        # 每次處理檔案時，都建立一個全新的 collection_name
+                        unique_collection_name = f"collection_{uuid.uuid4()}"
+                        
+                        vector_db = Chroma.from_documents(
+                            documents=all_splits, 
+                            embedding=embeddings,
+                            collection_name=unique_collection_name # 這裡強制使用新容器
+                        )
                         
                         st.session_state.vector_db = vector_db
                         st.session_state.processed_files = current_files_sig
-                        st.toast(f"✅ 深度處理完成！", icon="🧠")
+                        st.toast(f"✅ 資料庫已重建！", icon="🔄")
                     else:
                         st.warning("⚠️ 檔案內容為空")
                 except Exception as e:
@@ -144,6 +154,7 @@ with st.sidebar:
     k_value = st.slider("k值（閱讀廣度）", 2, 20, 8)
 
     st.markdown("")
+    
     if st.button("🗑️ 清空對話", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -189,11 +200,10 @@ if prompt := st.chat_input("請輸入問題..."):
                 message_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-                # 🌟 UI 優化重點：改用 Tabs 分頁顯示
+                # UI 優化：Tabs 分頁顯示
                 sources = response['context']
                 if sources:
-                    with st.expander("📚 參考來源 (Reference Context)", expanded=False):
-                        # 建立分頁籤
+                    with st.expander("📚 參考來源細節 (Reference Context)"):
                         tabs = st.tabs([f"來源 {i+1}" for i in range(len(sources))])
                         
                         for i, tab in enumerate(tabs):
@@ -202,18 +212,16 @@ if prompt := st.chat_input("請輸入問題..."):
                                 source_name = doc.metadata.get("source_filename", "未知文件")
                                 page_num = doc.metadata.get("page", 0) + 1
                                 
-                                # 使用 Columns 讓標題資訊更整齊
                                 c1, c2 = st.columns([2, 1])
                                 with c1:
                                     st.markdown(f"**📄 文件：** `{source_name}`")
                                 with c2:
                                     st.markdown(f"**📌 頁數：** `第 {page_num} 頁`")
                                 
-                                # 使用 info 框框呈現內容，增加質感
                                 st.info(doc.page_content)
-                                
+                
             except Exception as e:
                 st.error(f"❌ 錯誤: {e}")
     else:
         with st.chat_message("assistant"):
-            st.warning("⚠️ 請先上傳文件，我才能回答問題喔！")
+            st.warning("⚠️ 請先上傳文件，我才能回答問題喔！(若已重置，請重新上傳)")
