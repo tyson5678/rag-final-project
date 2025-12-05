@@ -132,12 +132,12 @@ with st.sidebar:
     st.markdown("")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🗑️ 清空對話", use_container_width=True):
+        if st.button("🗑️清空對話", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
     with col2:
         # 🌟 修改按鈕行為：使用 on_click 回調
-        if st.button("🔄 強制重置", type="primary", use_container_width=True, on_click=nuke_reset):
+        if st.button("🔄重置文件", type="primary", use_container_width=True, on_click=nuke_reset):
             # 這裡不需要做什麼，因為 on_click 已經處理了狀態，且 Streamlit 會自動 rerun
             pass
 
