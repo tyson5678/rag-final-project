@@ -130,16 +130,16 @@ with st.sidebar:
     k_value = st.slider("k值（閱讀廣度）", 2, 20, 8)
 
     st.markdown("")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("🗑️清空對話", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
-    with col2:
-        # 🌟 修改按鈕行為：使用 on_click 回調
-        if st.button("🔄重置文件", type="primary", use_container_width=True, on_click=nuke_reset):
-            # 這裡不需要做什麼，因為 on_click 已經處理了狀態，且 Streamlit 會自動 rerun
-            pass
+    # 🌟 修改點：移除 st.columns，直接依序排列按鈕
+    # 第一個按鈕：清空對話
+    if st.button("🗑️ 清空對話", use_container_width=True):
+        st.session_state.messages = []
+        st.rerun()
+        
+    # 第二個按鈕：完全重置 (加一點間距)
+    st.markdown("") 
+    if st.button("🔄 重置文件", type="primary", use_container_width=True, on_click=nuke_reset):
+        pass
 
 # ================= 聊天介面 =================
 
