@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import sys
 import tempfile
-import uuid # 🌟 新增：用來生成絕對不重複的 ID
+import uuid 
 
 # ================= 1. 雲端資料庫修正 =================
 try:
@@ -52,7 +52,6 @@ except:
 
 # ================= 5. 核心邏輯 (核彈重置機制) =================
 
-# 初始化 unique_id (這是控制上傳元件的靈魂)
 if "uploader_id" not in st.session_state:
     st.session_state.uploader_id = str(uuid.uuid4())
 
@@ -66,13 +65,11 @@ def nuke_reset():
     """核彈級重置：直接換一個新的 ID"""
     st.session_state.messages = []
     st.session_state.vector_db = None
-    # 產生一個全新的亂數 ID，這會強制 Streamlit 銷毀舊的上傳框
     st.session_state.uploader_id = str(uuid.uuid4()) 
 
 with st.sidebar:
     st.header("🗂️ 資料上傳")
     
-    # 🌟 重點：key 使用隨機生成的 uploader_id
     uploaded_files = st.file_uploader(
         "上傳文件 (PDF / Word)", 
         type=["pdf", "docx"], 
@@ -80,7 +77,6 @@ with st.sidebar:
         key=st.session_state.uploader_id 
     )
     
-    # 處理上傳
     if uploaded_files and st.session_state.vector_db is None:
         with st.spinner("🧠 AI 正在進行深度分析..."):
             try:
@@ -114,7 +110,7 @@ with st.sidebar:
                     os.remove(tmp_path)
 
                 if all_splits:
-                    # 🌟 修正點在這裡：強制指定 device 為 cpu
+                    # 強制指定 CPU，修復 Meta Tensor 錯誤
                     embeddings = HuggingFaceEmbeddings(
                         model_name="sentence-transformers/all-MiniLM-L6-v2",
                         model_kwargs={'device': 'cpu'}
@@ -134,13 +130,11 @@ with st.sidebar:
     k_value = st.slider("k值（閱讀廣度）", 2, 20, 8)
 
     st.markdown("")
-    # 🌟 修改點：移除 st.columns，直接依序排列按鈕
-    # 第一個按鈕：清空對話
+    
     if st.button("🗑️ 清空對話", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
         
-    # 第二個按鈕：完全重置 (加一點間距)
     st.markdown("") 
     if st.button("🔄 重置文件", type="primary", use_container_width=True, on_click=nuke_reset):
         pass
@@ -158,7 +152,6 @@ if prompt := st.chat_input("請輸入問題..."):
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    # 檢查是否有 vector_db
     if st.session_state.vector_db:
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
@@ -183,15 +176,28 @@ if prompt := st.chat_input("請輸入問題..."):
                 message_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-                with st.expander("📚 參考來源"):
-                    for i, doc in enumerate(response['context']):
-                        st.caption(f"📄 **{doc.metadata.get('source_filename')}** (p.{doc.metadata.get('page',0)+1})")
-                        st.text(doc.page_content[:100] + "...")
-                        st.divider()
-
+                # 🌟 優化點：使用 Tabs 分頁顯示參考來源
+                sources = response['context']
+                if sources:
+                    with st.expander("📚 檢視參考來源細節 (Reference Context)"):
+                        # 建立 Tabs
+                        tabs = st.tabs([f"來源 {i+1}" for i in range(len(sources))])
+                        
+                        for i, tab in enumerate(tabs):
+                            with tab:
+                                doc = sources[i]
+                                source_name = doc.metadata.get("source_filename", "未知文件")
+                                page_num = doc.metadata.get("page", 0) + 1
+                                
+                                # 使用 Markdown 排版
+                                st.markdown(f"**📄 文件名稱：** `{source_name}`")
+                                st.markdown(f"**📌 所在頁數：** `第 {page_num} 頁`")
+                                st.markdown("---")
+                                # 使用 info 框框顯示內容，質感更好
+                                st.info(doc.page_content)
+                
             except Exception as e:
                 st.error(f"❌ 錯誤: {e}")
     else:
-        # 如果資料庫是空的，直接拒絕回答，避免 AI 用自己的幻覺回答
         with st.chat_message("assistant"):
             st.warning("⚠️ 請先上傳文件，我才能回答問題喔！(若已重置，請重新上傳)")
