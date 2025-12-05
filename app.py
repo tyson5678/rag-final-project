@@ -20,7 +20,7 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-from langchain.chains.retrieval import create_retrieval_chain
+from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -34,7 +34,7 @@ try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 except:
     # ⚠️ 注意：上傳 GitHub 時，建議將引號內的真實 Key 刪除，改為提示文字
-    GROQ_API_KEY = "請填入Key"
+    GROQ_API_KEY = "api key"
 # ====================================================
 
 # 1. 設定網頁標題、圖示與版面
