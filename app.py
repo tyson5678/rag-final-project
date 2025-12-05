@@ -20,8 +20,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("🧠 專屬深度文件助手")
-st.caption("🚀 支援 PDF/Word · 核彈級重置修復版")
+st.title("深度文件分析助手")
+st.caption("🚀 Powered by Meta Llama 3.3 & Groq Inference Engine | Enterprise-Grade RAG System")
 
 # ================= 3. 安全載入套件 =================
 try:
@@ -126,8 +126,8 @@ with st.sidebar:
     st.divider()
     st.header("⚙️ 參數")
     
-    temperature = st.slider("模型創意度", 0.0, 1.0, 0.1, 0.1)
-    k_value = st.slider("閱讀廣度", 2, 20, 8)
+    temperature = st.slider("temperature（模型創意度）", 0.0, 1.0, 0.1, 0.1)
+    k_value = st.slider("k值（閱讀廣度）", 2, 20, 8)
 
     st.markdown("")
     col1, col2 = st.columns(2)
