@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-# ================= 2. 頁面設定 =================
+# ================= 2. 頁面質感設定 =================
 st.set_page_config(
     page_title="AI 深度知識庫", 
     page_icon="🧠", 
@@ -52,7 +52,6 @@ except:
 
 # ================= 5. 核心邏輯 =================
 
-# 初始化變數
 if "uploader_id" not in st.session_state:
     st.session_state.uploader_id = str(uuid.uuid4())
 if "messages" not in st.session_state:
@@ -60,7 +59,7 @@ if "messages" not in st.session_state:
 if "vector_db" not in st.session_state:
     st.session_state.vector_db = None
 if "processed_files" not in st.session_state:
-    st.session_state.processed_files = [] # 🌟 新增：用來記錄目前已經處理過哪些檔案
+    st.session_state.processed_files = [] 
 
 def nuke_reset():
     """核彈級重置"""
@@ -79,18 +78,13 @@ with st.sidebar:
         key=st.session_state.uploader_id 
     )
     
-    # 🌟 邏輯修正重點：
-    # 1. 產生一個「目前的檔案清單指紋」(包含檔名和大小)，用來判斷檔案有沒有變
+    # 邏輯修復：偵測檔案變動
     current_files_sig = [(f.name, f.size) for f in uploaded_files] if uploaded_files else []
     
-    # 2. 判斷邏輯：
-    #    情況 A: 有上傳檔案，而且跟上次處理的不一樣 -> 執行重新處理
-    #    情況 B: 沒有上傳檔案 -> 清空資料庫
-    
     if uploaded_files:
+        # 如果檔案清單跟上次不一樣，或者是第一次上傳
         if current_files_sig != st.session_state.processed_files:
-            # 發現檔案有變動！重新建立資料庫
-            with st.spinner("🧠 偵測到文件變動，正在重新分析..."):
+            with st.spinner("🧠 偵測到新文件，AI 正在進行深度分析..."):
                 try:
                     all_splits = []
                     for uploaded_file in uploaded_files:
@@ -122,23 +116,22 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 🌟 錯誤修正點：強制使用 CPU 避免 Meta Tensor 錯誤
+                        # 錯誤修復：強制使用 CPU
                         embeddings = HuggingFaceEmbeddings(
                             model_name="sentence-transformers/all-MiniLM-L6-v2",
                             model_kwargs={'device': 'cpu'}
                         )
                         vector_db = Chroma.from_documents(documents=all_splits, embedding=embeddings)
                         
-                        # 更新狀態
                         st.session_state.vector_db = vector_db
-                        st.session_state.processed_files = current_files_sig # 記錄現在處理好的檔案
-                        st.toast(f"✅ 資料庫已更新！", icon="🔄")
+                        st.session_state.processed_files = current_files_sig
+                        st.toast(f"✅ 深度處理完成！", icon="🧠")
                     else:
                         st.warning("⚠️ 檔案內容為空")
                 except Exception as e:
                     st.error(f"❌ 錯誤: {e}")
     else:
-        # 如果使用者把檔案都刪光了，也要把資料庫清空
+        # 如果沒檔案，清空資料庫
         if st.session_state.vector_db is not None:
             st.session_state.vector_db = None
             st.session_state.processed_files = []
@@ -151,7 +144,6 @@ with st.sidebar:
     k_value = st.slider("k值（閱讀廣度）", 2, 20, 8)
 
     st.markdown("")
-    
     if st.button("🗑️ 清空對話", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
@@ -197,12 +189,29 @@ if prompt := st.chat_input("請輸入問題..."):
                 message_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-                with st.expander("📚 參考來源"):
-                    for i, doc in enumerate(response['context']):
-                        st.caption(f"📄 **{doc.metadata.get('source_filename')}** (p.{doc.metadata.get('page',0)+1})")
-                        st.text(doc.page_content[:100] + "...")
-                        st.divider()
-
+                # 🌟 UI 優化重點：改用 Tabs 分頁顯示
+                sources = response['context']
+                if sources:
+                    with st.expander("📚 參考來源 (Reference Context)", expanded=False):
+                        # 建立分頁籤
+                        tabs = st.tabs([f"來源 {i+1}" for i in range(len(sources))])
+                        
+                        for i, tab in enumerate(tabs):
+                            with tab:
+                                doc = sources[i]
+                                source_name = doc.metadata.get("source_filename", "未知文件")
+                                page_num = doc.metadata.get("page", 0) + 1
+                                
+                                # 使用 Columns 讓標題資訊更整齊
+                                c1, c2 = st.columns([2, 1])
+                                with c1:
+                                    st.markdown(f"**📄 文件：** `{source_name}`")
+                                with c2:
+                                    st.markdown(f"**📌 頁數：** `第 {page_num} 頁`")
+                                
+                                # 使用 info 框框呈現內容，增加質感
+                                st.info(doc.page_content)
+                                
             except Exception as e:
                 st.error(f"❌ 錯誤: {e}")
     else:
