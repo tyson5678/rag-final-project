@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("深度文件分析助手")
+st.title("文件深度分析助手")
 st.caption("🚀 Powered by Meta Llama 3.3 & Groq Inference Engine | Enterprise-Grade RAG System")
 
 # ================= 3. 安全載入套件 =================
