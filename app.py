@@ -20,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("文件深度分析助手")
+st.title("深度文件分析助手")
 st.caption("🚀 Powered by Meta Llama 3.3 & Groq Inference Engine | Enterprise-Grade RAG System")
 
 # ================= 3. 安全載入套件 =================
@@ -29,7 +29,8 @@ try:
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-    from langchain_huggingface import HuggingFaceEmbeddings
+    # 🌟 修改點：改用 community 的舊版接口，配合 sentence-transformers 2.2.2
+    from langchain_community.embeddings import HuggingFaceEmbeddings
     from langchain_chroma import Chroma
     try:
         from langchain.chains import create_retrieval_chain
@@ -52,7 +53,6 @@ except:
 
 # ================= 5. 核心邏輯 =================
 
-# 初始化變數
 if "uploader_id" not in st.session_state:
     st.session_state.uploader_id = str(uuid.uuid4())
 if "messages" not in st.session_state:
@@ -79,11 +79,9 @@ with st.sidebar:
         key=st.session_state.uploader_id 
     )
     
-    # 邏輯修復：偵測檔案變動
     current_files_sig = [(f.name, f.size) for f in uploaded_files] if uploaded_files else []
     
     if uploaded_files:
-        # 如果檔案清單跟上次不一樣，或者是第一次上傳
         if current_files_sig != st.session_state.processed_files:
             with st.spinner("🧠 偵測到文件變動，正在重新建立全新資料庫..."):
                 try:
@@ -117,20 +115,18 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 🌟 錯誤修正點 1：強制使用 CPU 避免 Meta Tensor 錯誤
+                        # 🌟 這裡還是保留 device='cpu'，雙重保險
                         embeddings = HuggingFaceEmbeddings(
                             model_name="sentence-transformers/all-MiniLM-L6-v2",
                             model_kwargs={'device': 'cpu'}
                         )
                         
-                        # 🌟 重大修正點 2：給資料庫一個隨機名稱，保證隔離！
-                        # 每次處理檔案時，都建立一個全新的 collection_name
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
                         vector_db = Chroma.from_documents(
                             documents=all_splits, 
                             embedding=embeddings,
-                            collection_name=unique_collection_name # 這裡強制使用新容器
+                            collection_name=unique_collection_name 
                         )
                         
                         st.session_state.vector_db = vector_db
@@ -141,7 +137,6 @@ with st.sidebar:
                 except Exception as e:
                     st.error(f"❌ 錯誤: {e}")
     else:
-        # 如果沒檔案，清空資料庫
         if st.session_state.vector_db is not None:
             st.session_state.vector_db = None
             st.session_state.processed_files = []
@@ -200,7 +195,6 @@ if prompt := st.chat_input("請輸入問題..."):
                 message_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-                # UI 優化：Tabs 分頁顯示
                 sources = response['context']
                 if sources:
                     with st.expander("📚 參考來源細節 (Reference Context)"):
