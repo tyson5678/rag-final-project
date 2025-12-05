@@ -96,8 +96,8 @@ with st.sidebar:
                     
                     # 使用固定的最佳參數 (Chunk=100)，讓介面更乾淨
                     text_splitter = RecursiveCharacterTextSplitter(
-                        chunk_size=100, 
-                        chunk_overlap=50,
+                        chunk_size=800,   # 改大一點，讓上下文更連貫
+                        chunk_overlap=150, # 重疊部分也加大
                         separators=["\n\n", "\n", "。", "！", "？", " ", ""]
                     )
                     splits = text_splitter.split_documents(docs)
@@ -119,7 +119,7 @@ with st.sidebar:
     
     # 只保留這兩個最重要的滑桿
     temperature = st.slider("temperature（模型創意度）", 0.0, 1.0, 0.1, 0.1)
-    k_value = st.slider("k值（參考段落數）", 2, 8, 4)
+    k_value = st.slider("top-k (參考段落數)", min_value=2, max_value=20, value=8, help="設越高，AI 讀的資料越多，回答越詳細，但速度會稍慢。")
 
     st.markdown("") # 加一點留白
     col1, col2 = st.columns(2)
@@ -155,12 +155,17 @@ if prompt := st.chat_input("請輸入問題..."):
             try:
                 llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=temperature)
                 
-                # 提示詞優化：更簡潔專業
+                # 提示詞優化：極致詳細版
                 qa_prompt = ChatPromptTemplate.from_template("""
-                你是一個專業助理。請根據以下【上下文】回答問題。
-                1. 答案必須有憑有據。
-                2. 若無相關資訊，請誠實回答「文件中未提及」。
-                3. 請用台灣繁體中文回答。
+                你是一個高階學術研究員。請根據以下【上下文】回答問題。
+                
+                【回答策略】：
+                1. **拒絕籠統**：不要只給摘要，請提取上下文中的每一個細節、數據、日期和專有名詞。
+                2. **完整性**：如果上下文提到多個觀點，請全部列出，不要遺漏。
+                3. **結構化**：使用條列式或表格呈現複雜資訊。
+                4. **引用**：在回答中適當引用原文的關鍵句。
+                5. 若無相關資訊，請誠實回答「文件中未提及」。
+                6. 請用台灣繁體中文回答。
                 
                 【上下文】:
                 {context}
