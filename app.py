@@ -28,14 +28,13 @@ try:
     import langchain
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-    # 🌟 使用最新的 huggingface 整合包
-    from langchain_huggingface import HuggingFaceEmbeddings
-    from langchain_chroma import Chroma
-    # 使用最新的 Chain 架構
-    from langchain.chains import create_retrieval_chain
-    from langchain.chains.combine_documents import create_stuff_documents_chain
-    from langchain_core.prompts import ChatPromptTemplate
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    # 🌟 使用 0.1.20 版本的穩定接口
+    from langchain_community.embeddings import HuggingFaceEmbeddings
+    from langchain_community.vectorstores import Chroma
+    # 🌟 改回最經典的 RetrievalQA，這絕對存在，不會報錯
+    from langchain.chains import RetrievalQA
+    from langchain_core.prompts import PromptTemplate
     
 except ImportError as e:
     st.error(f"❌ 系統啟動失敗！原因: {e}")
@@ -113,12 +112,8 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 🌟🌟🌟 關鍵修正：強制指定 CPU 模式 🌟🌟🌟
-                        # 這行 model_kwargs={'device': 'cpu'} 是解決 Meta Tensor 錯誤的唯一解藥
-                        embeddings = HuggingFaceEmbeddings(
-                            model_name="sentence-transformers/all-MiniLM-L6-v2",
-                            model_kwargs={'device': 'cpu'} 
-                        )
+                        # 🌟 使用 sentence-transformers 2.2.2 就不需要指定 device='cpu'，它預設就很穩定
+                        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
                         
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
@@ -176,26 +171,37 @@ if prompt := st.chat_input("請輸入問題..."):
             try:
                 llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=temperature)
                 
-                qa_prompt = ChatPromptTemplate.from_template("""
+                # 🌟 使用 PromptTemplate 配合舊版 Chain
+                template = """
                 你是一個高階學術研究員。請根據以下【上下文】回答問題。
                 1. 若無相關資訊，請誠實回答「文件中未提及」。
                 2. 請用台灣繁體中文回答。
-                【上下文】:{context}
-                【問題】:{input}
-                """)
-
-                retriever = st.session_state.vector_db.as_retriever(search_kwargs={"k": k_value})
-                document_chain = create_stuff_documents_chain(llm, qa_prompt)
-                retrieval_chain = create_retrieval_chain(retriever, document_chain)
                 
-                response = retrieval_chain.invoke({"input": prompt})
-                answer = response['answer']
+                【上下文】:
+                {context}
+                
+                【問題】:
+                {question}
+                """
+                QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
+
+                # 🌟 使用 RetrievalQA (這是 0.1.20 版的核心)
+                qa_chain = RetrievalQA.from_chain_type(
+                    llm=llm,
+                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": k_value}),
+                    chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
+                    return_source_documents=True # 這樣才能拿到來源
+                )
+                
+                # 執行
+                response = qa_chain.invoke({"query": prompt})
+                answer = response['result']
                 
                 message_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-                # UI 優化：Tabs 分頁顯示
-                sources = response['context']
+                # UI 優化：Tabs 分頁顯示來源
+                sources = response['source_documents'] # 舊版的回傳 key 是 source_documents
                 if sources:
                     with st.expander("📚 參考來源細節 (Reference Context)"):
                         tabs = st.tabs([f"來源 {i+1}" for i in range(len(sources))])
