@@ -29,7 +29,7 @@ try:
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-    # 🌟 關鍵修改：改用 FastEmbed，輕量且絕對穩定
+    # 🌟 關鍵修改：改用 FastEmbed，輕量且絕對穩定，不依賴 PyTorch
     from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
     from langchain_chroma import Chroma
     from langchain.chains import create_retrieval_chain
@@ -112,7 +112,7 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 🌟 這裡改用 FastEmbed，自動下載輕量模型，無需設定 device
+                        # 🌟 這裡改用 FastEmbed，自動下載輕量模型，保證安裝成功
                         embeddings = FastEmbedEmbeddings() 
                         
                         unique_collection_name = f"collection_{uuid.uuid4()}"
