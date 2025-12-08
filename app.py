@@ -20,21 +20,21 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("文件深度分析助手")
-st.caption("🚀 Powered by Meta Llama 3.3 & Groq Inference Engine | Enterprise-Grade RAG System")
+st.title("文件分析助手")
+st.caption("🚀 Powered by Meta Llama 3.3 & Groq | FastEmbed Engine")
 
 # ================= 3. 安全載入套件 =================
 try:
     import langchain
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-    # 🌟 使用 0.1.20 版本的穩定接口
-    from langchain_community.embeddings import HuggingFaceEmbeddings
-    from langchain_community.vectorstores import Chroma
-    # 🌟 改回最經典的 RetrievalQA，這絕對存在，不會報錯
-    from langchain.chains import RetrievalQA
-    from langchain_core.prompts import PromptTemplate
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    # 🌟 關鍵修改：改用 FastEmbed，輕量且絕對穩定
+    from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+    from langchain_chroma import Chroma
+    from langchain.chains import create_retrieval_chain
+    from langchain.chains.combine_documents import create_stuff_documents_chain
+    from langchain_core.prompts import ChatPromptTemplate
     
 except ImportError as e:
     st.error(f"❌ 系統啟動失敗！原因: {e}")
@@ -80,7 +80,7 @@ with st.sidebar:
     
     if uploaded_files:
         if current_files_sig != st.session_state.processed_files:
-            with st.spinner("🧠 偵測到文件變動，正在重建資料庫..."):
+            with st.spinner("🧠 偵測到文件變動，正在重建資料庫 (FastEmbed模式)..."):
                 try:
                     all_splits = []
                     for uploaded_file in uploaded_files:
@@ -112,8 +112,8 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 🌟 使用 sentence-transformers 2.2.2 就不需要指定 device='cpu'，它預設就很穩定
-                        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+                        # 🌟 這裡改用 FastEmbed，自動下載輕量模型，無需設定 device
+                        embeddings = FastEmbedEmbeddings() 
                         
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
@@ -171,37 +171,25 @@ if prompt := st.chat_input("請輸入問題..."):
             try:
                 llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=temperature)
                 
-                # 🌟 使用 PromptTemplate 配合舊版 Chain
-                template = """
+                qa_prompt = ChatPromptTemplate.from_template("""
                 你是一個高階學術研究員。請根據以下【上下文】回答問題。
                 1. 若無相關資訊，請誠實回答「文件中未提及」。
                 2. 請用台灣繁體中文回答。
-                
-                【上下文】:
-                {context}
-                
-                【問題】:
-                {question}
-                """
-                QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
+                【上下文】:{context}
+                【問題】:{input}
+                """)
 
-                # 🌟 使用 RetrievalQA (這是 0.1.20 版的核心)
-                qa_chain = RetrievalQA.from_chain_type(
-                    llm=llm,
-                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": k_value}),
-                    chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
-                    return_source_documents=True # 這樣才能拿到來源
-                )
+                retriever = st.session_state.vector_db.as_retriever(search_kwargs={"k": k_value})
+                document_chain = create_stuff_documents_chain(llm, qa_prompt)
+                retrieval_chain = create_retrieval_chain(retriever, document_chain)
                 
-                # 執行
-                response = qa_chain.invoke({"query": prompt})
-                answer = response['result']
+                response = retrieval_chain.invoke({"input": prompt})
+                answer = response['answer']
                 
                 message_placeholder.markdown(answer)
                 st.session_state.messages.append({"role": "assistant", "content": answer})
                 
-                # UI 優化：Tabs 分頁顯示來源
-                sources = response['source_documents'] # 舊版的回傳 key 是 source_documents
+                sources = response['context']
                 if sources:
                     with st.expander("📚 參考來源細節 (Reference Context)"):
                         tabs = st.tabs([f"來源 {i+1}" for i in range(len(sources))])
