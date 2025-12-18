@@ -15,25 +15,26 @@ except ImportError:
 # ================= 2. 頁面設定 =================
 st.set_page_config(
     page_title="AI 智能投資分析師", 
-    page_icon="📈", 
+    page_icon="💎", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("📈 AI 智能投資分析師")
-st.caption("🚀 Powered by Llama 3.1 8B & Groq | Google Search Integrated")
+st.title("💎 AI 智能投資分析師 (Gemini 版)")
+st.caption("🚀 Powered by Google Gemini 1.5 Flash | High Token Limit")
 
 # ================= 3. 匯入必要套件 =================
 try:
     import langchain
-    from langchain_groq import ChatGroq
+    # 🌟 換成 Google 的模型
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
     from langchain_community.vectorstores import Chroma
     from langchain.prompts import ChatPromptTemplate
     
-    # Agent 模組
     from langchain.agents import initialize_agent, AgentType, Tool
     from langchain.chains import RetrievalQA
     import yfinance as yf
@@ -46,15 +47,16 @@ except ImportError as e:
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # ================= 4. API Key =================
+# 🌟 改抓 Google 的 Key
 try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except:
-    GROQ_API_KEY = "請填入Key"
+    GOOGLE_API_KEY = "請填入Google_API_Key"
 
 # ================= 5. 定義工具 (Tools) =================
 
 def get_stock_price_func(symbol: str):
-    """查詢股票價格的實際函式"""
+    """查詢股票價格"""
     try:
         stock = yf.Ticker(symbol)
         info = stock.info
@@ -65,9 +67,8 @@ def get_stock_price_func(symbol: str):
         return f"查詢失敗: {e}"
 
 def get_google_news_func(query: str):
-    """Google 搜尋函式"""
+    """Google 搜尋"""
     try:
-        # 為了節省 Token，我們只抓前 3 筆結果
         results = google_search(query, num_results=3, advanced=True)
         output_text = f"【Google 搜尋結果 - {query}】\n"
         count = 0
@@ -75,8 +76,7 @@ def get_google_news_func(query: str):
             count += 1
             output_text += f"{count}. {r.title}\n   {r.description}\n\n"
         
-        if count == 0:
-            return "未搜尋到相關結果。"
+        if count == 0: return "未搜尋到相關結果。"
         return output_text
     except Exception as e:
         return f"搜尋失敗: {e}"
@@ -93,7 +93,6 @@ if "processed_files" not in st.session_state:
     st.session_state.processed_files = [] 
 
 def nuke_reset():
-    """核彈級重置"""
     st.session_state.messages = []
     st.session_state.vector_db = None
     st.session_state.processed_files = []
@@ -113,7 +112,7 @@ with st.sidebar:
     
     if uploaded_files:
         if current_files_sig != st.session_state.processed_files:
-            with st.spinner("🧠 正在讀取財報數據 (FastEmbed)..."):
+            with st.spinner("🧠 正在讀取財報數據..."):
                 try:
                     all_splits = []
                     for uploaded_file in uploaded_files:
@@ -124,15 +123,12 @@ with st.sidebar:
                             tmp_file.write(uploaded_file.getvalue())
                             tmp_path = tmp_file.name
 
-                        if file_ext == ".pdf":
-                            loader = PyPDFLoader(tmp_path)
-                        elif file_ext == ".docx":
-                            loader = Docx2txtLoader(tmp_path)
-                        else:
-                            continue
+                        if file_ext == ".pdf": loader = PyPDFLoader(tmp_path)
+                        elif file_ext == ".docx": loader = Docx2txtLoader(tmp_path)
+                        else: continue
                             
                         docs = loader.load()
-                        text_splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=100)
+                        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
                         splits = text_splitter.split_documents(docs)
                         all_splits.extend(splits)
                         os.remove(tmp_path)
@@ -149,7 +145,7 @@ with st.sidebar:
                         
                         st.session_state.vector_db = vector_db
                         st.session_state.processed_files = current_files_sig
-                        st.toast(f"✅ 財報資料庫建立完成！", icon="📊")
+                        st.toast(f"✅ 資料庫建立完成！", icon="💎")
                     else:
                         st.warning("⚠️ 檔案內容為空")
                 except Exception as e:
@@ -172,7 +168,7 @@ with st.sidebar:
 # ================= 聊天介面 =================
 
 if not st.session_state.messages:
-    st.info("👋 我是 AI 投資分析師 (Llama 8B 版)，請下達指令。")
+    st.info("👋 我是 Gemini 投資助手，額度超大，請盡量問！")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -184,14 +180,15 @@ if prompt := st.chat_input("請輸入問題..."):
 
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        message_placeholder.markdown("🤔 AI 正在思考...")
+        message_placeholder.markdown("💎 Gemini 正在思考...")
         
         try:
-            # 🌟 關鍵修改：換成 8B 小模型，避開 70B 的額度限制
-            llm = ChatGroq(
-                groq_api_key=GROQ_API_KEY, 
-                model_name="llama-3.1-8b-instant", # 改用這個！
-                temperature=0.1
+            # 🌟 核心修改：使用 Google Gemini 1.5 Flash
+            llm = ChatGoogleGenerativeAI(
+                google_api_key=GOOGLE_API_KEY,
+                model="gemini-1.5-flash",
+                temperature=0.1,
+                convert_system_message_to_human=True # 修正 Agent 格式問題
             )
             
             tools = [
@@ -210,7 +207,7 @@ if prompt := st.chat_input("請輸入問題..."):
             if st.session_state.vector_db:
                 qa = RetrievalQA.from_chain_type(
                     llm=llm,
-                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 5})
+                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 10}) # Gemini 可以讀更多，K 開大一點！
                 )
                 tools.append(
                     Tool(
@@ -235,5 +232,5 @@ if prompt := st.chat_input("請輸入問題..."):
             
         except Exception as e:
             st.error(f"❌ 錯誤: {e}")
-            if "429" in str(e):
-                st.warning("⚠️ 免費版額度已滿，請休息一下或換個帳號 API Key！")
+            if "API_KEY" in str(e):
+                st.warning("⚠️ 請檢查 Google API Key 設定！")
