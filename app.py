@@ -21,22 +21,23 @@ st.set_page_config(
 )
 
 st.title("📈 AI 智能投資分析師")
-st.caption("🚀 整合即時股價 (Yahoo Finance) + 網路新聞 + 財報深度分析 (RAG)")
+st.caption("🚀 Powered by Meta Llama 3.3 & Groq | Stable Version 0.1.20")
 
-# ================= 3. 匯入必要套件 =================
+# ================= 3. 匯入必要套件 (0.1.20 專用寫法) =================
 try:
     import langchain
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    # 🌟 使用 FastEmbed (輕量穩定)
     from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-    from langchain_chroma import Chroma
-    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_community.vectorstores import Chroma
+    from langchain.prompts import ChatPromptTemplate
     
-    # 🌟 修改點：改用最經典、相容性最高的 Agent 建構方式
-    from langchain.agents import initialize_agent, AgentType
-    from langchain.tools import Tool
+    # 🌟 0.1.20 版本的 Agent 寫法
+    from langchain.agents import initialize_agent, AgentType, Tool
     from langchain_community.tools import DuckDuckGoSearchRun
+    from langchain.chains import RetrievalQA
     import yfinance as yf
     
 except ImportError as e:
@@ -126,6 +127,7 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
+                        # 🌟 使用 FastEmbed (輕量、CPU專用)
                         embeddings = FastEmbedEmbeddings()
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
@@ -178,7 +180,7 @@ if prompt := st.chat_input("請輸入問題..."):
         try:
             llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=0.1)
             
-            # 🌟 定義工具 (相容舊版寫法)
+            # 🌟 定義工具 (使用 Tool 類別，這是舊版標準寫法)
             tools = [
                 Tool(
                     name="Stock_Price",
@@ -194,29 +196,28 @@ if prompt := st.chat_input("請輸入問題..."):
             
             # 如果有 RAG 資料庫，加入檢索工具
             if st.session_state.vector_db:
-                qa_chain = langchain.chains.RetrievalQA.from_chain_type(
+                qa = RetrievalQA.from_chain_type(
                     llm=llm,
                     retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 5})
                 )
                 tools.append(
                     Tool(
                         name="Financial_Report_RAG",
-                        func=qa_chain.run,
+                        func=qa.run,
                         description="用於查詢使用者上傳的財報、PDF 文件內容。"
                     )
                 )
 
             # 🌟 建立 Agent (使用 initialize_agent)
-            # 這種寫法支援 LangChain 所有版本 (0.0.x ~ 0.3.x)
+            # 這是 0.1.20 版本的核心功能，絕對支援
             agent = initialize_agent(
                 tools, 
                 llm, 
-                agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION, # 結構化思考模式
+                agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
                 verbose=True,
-                handle_parsing_errors=True # 自動修正格式錯誤，這很重要
+                handle_parsing_errors=True # 容錯機制
             )
             
-            # 執行
             response = agent.run(prompt)
             
             message_placeholder.markdown(response)
