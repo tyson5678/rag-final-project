@@ -29,14 +29,13 @@ try:
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-    # 🌟 使用 FastEmbed 避免雲端當機
     from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
     from langchain_chroma import Chroma
     from langchain_core.prompts import ChatPromptTemplate
-    # 🌟 這些是新版 LangChain 的功能，requirements.txt 必須 >=0.2.0
-    from langchain.agents import create_tool_calling_agent, AgentExecutor
-    from langchain_core.tools import tool
-    from langchain.tools.retriever import create_retriever_tool
+    
+    # 🌟 修改點：改用最經典、相容性最高的 Agent 建構方式
+    from langchain.agents import initialize_agent, AgentType
+    from langchain.tools import Tool
     from langchain_community.tools import DuckDuckGoSearchRun
     import yfinance as yf
     
@@ -54,29 +53,19 @@ except:
 
 # ================= 5. 定義工具 (Tools) =================
 
-@tool
-def get_stock_price(symbol: str):
-    """
-    獲取股票的即時股價資訊。
-    輸入參數 symbol 必須是股票代碼。
-    台股請加上 .TW (例如 2330.TW)，美股直接輸入代碼 (例如 NVDA, AAPL)。
-    """
+def get_stock_price_func(symbol: str):
+    """查詢股票價格的實際函式"""
     try:
         stock = yf.Ticker(symbol)
         info = stock.info
         current_price = info.get('currentPrice', 'N/A')
         currency = info.get('currency', 'USD')
-        pe_ratio = info.get('trailingPE', 'N/A')
-        market_cap = info.get('marketCap', 'N/A')
-        return f"【{symbol} 即時數據】\n現價: {current_price} {currency}\n本益比(P/E): {pe_ratio}\n市值: {market_cap}"
+        return f"【{symbol}】現價: {current_price} {currency}"
     except Exception as e:
         return f"查詢失敗: {e}"
 
-@tool
-def get_company_news(query: str):
-    """
-    搜尋關於該公司的最新網路新聞或市場消息。
-    """
+def get_news_func(query: str):
+    """查詢新聞的實際函式"""
     search = DuckDuckGoSearchRun()
     return search.run(query)
 
@@ -131,14 +120,12 @@ with st.sidebar:
                             continue
                             
                         docs = loader.load()
-                        # Agent 模式下，切分可以稍微小一點，讓檢索更精準
                         text_splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=100)
                         splits = text_splitter.split_documents(docs)
                         all_splits.extend(splits)
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 🌟 使用 FastEmbed (輕量、CPU專用)
                         embeddings = FastEmbedEmbeddings()
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
@@ -191,35 +178,49 @@ if prompt := st.chat_input("請輸入問題..."):
         try:
             llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=0.1)
             
-            # 定義工具
-            tools = [get_stock_price, get_company_news]
+            # 🌟 定義工具 (相容舊版寫法)
+            tools = [
+                Tool(
+                    name="Stock_Price",
+                    func=get_stock_price_func,
+                    description="輸入股票代碼(如 2330.TW)，回傳即時股價。"
+                ),
+                Tool(
+                    name="Google_Search",
+                    func=get_news_func,
+                    description="輸入搜尋關鍵字，回傳網路新聞。"
+                )
+            ]
             
             # 如果有 RAG 資料庫，加入檢索工具
             if st.session_state.vector_db:
-                retriever = st.session_state.vector_db.as_retriever(search_kwargs={"k": 5})
-                retriever_tool = create_retriever_tool(
-                    retriever,
-                    "search_financial_report",
-                    "搜尋使用者上傳的財報內容。當問題涉及公司內部數據、財報細節時使用。"
+                qa_chain = langchain.chains.RetrievalQA.from_chain_type(
+                    llm=llm,
+                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 5})
                 )
-                tools.append(retriever_tool)
+                tools.append(
+                    Tool(
+                        name="Financial_Report_RAG",
+                        func=qa_chain.run,
+                        description="用於查詢使用者上傳的財報、PDF 文件內容。"
+                    )
+                )
 
-            # 建立 Agent
-            prompt_template = ChatPromptTemplate.from_messages([
-                ("system", "你是一個專業的投資分析師。結合『即時數據』(股價、新聞) 與 『內部文件』(若有) 來回答。請用繁體中文。"),
-                ("placeholder", "{chat_history}"),
-                ("human", "{input}"),
-                ("placeholder", "{agent_scratchpad}"),
-            ])
+            # 🌟 建立 Agent (使用 initialize_agent)
+            # 這種寫法支援 LangChain 所有版本 (0.0.x ~ 0.3.x)
+            agent = initialize_agent(
+                tools, 
+                llm, 
+                agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION, # 結構化思考模式
+                verbose=True,
+                handle_parsing_errors=True # 自動修正格式錯誤，這很重要
+            )
             
-            agent = create_tool_calling_agent(llm, tools, prompt_template)
-            agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+            # 執行
+            response = agent.run(prompt)
             
-            response = agent_executor.invoke({"input": prompt})
-            answer = response['output']
-            
-            message_placeholder.markdown(answer)
-            st.session_state.messages.append({"role": "assistant", "content": answer})
+            message_placeholder.markdown(response)
+            st.session_state.messages.append({"role": "assistant", "content": response})
             
         except Exception as e:
             st.error(f"❌ 錯誤: {e}")
