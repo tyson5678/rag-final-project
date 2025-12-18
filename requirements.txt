@@ -9,5 +9,5 @@ fastembed
 pypdf
 docx2txt
 yfinance
-duckduckgo-search
+googlesearch-python
 pysqlite3-binary

@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 st.title("📈 AI 智能投資分析師")
-st.caption("🚀 Powered by Meta Llama 3.3 & Groq | Stable Version 0.2.14")
+st.caption("🚀 Powered by Meta Llama 3.3 & Groq | Google Search Integrated")
 
 # ================= 3. 匯入必要套件 =================
 try:
@@ -34,15 +34,17 @@ try:
     from langchain_community.vectorstores import Chroma
     from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
     
-    # 🌟 LangChain 0.2.x 依然支援 initialize_agent
+    # 🌟 0.2.x Agent 寫法
     from langchain.agents import initialize_agent, AgentType, Tool
-    from langchain_community.tools import DuckDuckGoSearchRun
     from langchain.chains import RetrievalQA
     import yfinance as yf
     
+    # 🌟 Google Search 套件
+    from googlesearch import search as google_search
+    
 except ImportError as e:
     st.error(f"❌ 系統啟動失敗！原因: {e}")
-    st.info("💡 請確認 requirements.txt 鎖定 langchain==0.2.14")
+    st.info("💡 請確認 requirements.txt 包含 googlesearch-python")
     st.stop()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -67,13 +69,27 @@ def get_stock_price_func(symbol: str):
     except Exception as e:
         return f"查詢失敗: {e}"
 
-def get_news_func(query: str):
-    """查詢新聞的實際函式"""
+def get_google_news_func(query: str):
+    """
+    使用 Google Search 搜尋最新新聞或資訊。
+    """
     try:
-        search = DuckDuckGoSearchRun()
-        return search.run(query)
+        # advanced=True 會回傳物件 (包含標題、摘要、連結)
+        # num_results=5 設定抓取前 5 筆
+        results = google_search(query, num_results=5, advanced=True)
+        
+        output_text = f"【Google 搜尋結果 - 關鍵字：{query}】\n"
+        count = 0
+        for r in results:
+            count += 1
+            output_text += f"{count}. 標題: {r.title}\n   摘要: {r.description}\n   連結: {r.url}\n\n"
+        
+        if count == 0:
+            return "未搜尋到相關結果。"
+            
+        return output_text
     except Exception as e:
-        return f"搜尋失敗: {e}"
+        return f"Google 搜尋失敗: {e}"
 
 # ================= 6. 核心邏輯 =================
 
@@ -132,7 +148,7 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 使用 FastEmbed，穩定且輕量
+                        # 使用 FastEmbed (輕量、CPU專用)
                         embeddings = FastEmbedEmbeddings()
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
@@ -158,7 +174,7 @@ with st.sidebar:
     st.divider()
     st.markdown("### 💡 使用範例")
     st.markdown("- 查股價：`2330.TW 股價`")
-    st.markdown("- 查新聞：`NVDA 最新新聞`")
+    st.markdown("- 查新聞：`Google 搜尋 NVDA 最新新聞`")
     st.markdown("- 綜合：(需上傳) `結合股價分析這份財報`")
     
     st.markdown("") 
@@ -193,14 +209,13 @@ if prompt := st.chat_input("請輸入問題..."):
                     description="輸入股票代碼(如 2330.TW)，回傳即時股價。"
                 ),
                 Tool(
-                    name="Google_Search",
-                    func=get_news_func,
-                    description="輸入搜尋關鍵字，回傳網路新聞。"
+                    name="Google_Search", # 🌟 更新為 Google Search
+                    func=get_google_news_func,
+                    description="用於搜尋最新的市場新聞、公司動態或網路資訊。輸入參數為搜尋關鍵字。"
                 )
             ]
             
             if st.session_state.vector_db:
-                # 使用 RetrievalQA
                 qa = RetrievalQA.from_chain_type(
                     llm=llm,
                     retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 5})
@@ -213,12 +228,12 @@ if prompt := st.chat_input("請輸入問題..."):
                     )
                 )
 
-            # 🌟 0.2.14 版本：支援 initialize_agent 且修復了 datetime bug
+            # 🌟 建立 Agent
             agent = initialize_agent(
                 tools, 
                 llm, 
                 agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-                verbose=False, # 關閉 verbose 以防萬一
+                verbose=False, # 關閉 verbose 避免 datetime 錯誤
                 handle_parsing_errors=True
             )
             
