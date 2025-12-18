@@ -21,30 +21,26 @@ st.set_page_config(
 )
 
 st.title("📈 AI 智能投資分析師")
-st.caption("🚀 Powered by Meta Llama 3.3 & Groq | Google Search Integrated")
+st.caption("🚀 Powered by Llama 3.1 8B & Groq | Google Search Integrated")
 
 # ================= 3. 匯入必要套件 =================
 try:
     import langchain
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-    # 🌟 使用 FastEmbed 避免 GPU 錯誤
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
     from langchain_community.vectorstores import Chroma
-    from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+    from langchain.prompts import ChatPromptTemplate
     
-    # 🌟 0.2.x Agent 寫法
+    # Agent 模組
     from langchain.agents import initialize_agent, AgentType, Tool
     from langchain.chains import RetrievalQA
     import yfinance as yf
-    
-    # 🌟 Google Search 套件
     from googlesearch import search as google_search
     
 except ImportError as e:
     st.error(f"❌ 系統啟動失敗！原因: {e}")
-    st.info("💡 請確認 requirements.txt 包含 googlesearch-python")
     st.stop()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -63,33 +59,27 @@ def get_stock_price_func(symbol: str):
         stock = yf.Ticker(symbol)
         info = stock.info
         currency = info.get('currency', 'USD')
-        # 多重欄位抓取，增加成功率
         price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('ask') or 'N/A'
         return f"【{symbol}】現價: {price} {currency}"
     except Exception as e:
         return f"查詢失敗: {e}"
 
 def get_google_news_func(query: str):
-    """
-    使用 Google Search 搜尋最新新聞或資訊。
-    """
+    """Google 搜尋函式"""
     try:
-        # advanced=True 會回傳物件 (包含標題、摘要、連結)
-        # num_results=5 設定抓取前 5 筆
-        results = google_search(query, num_results=5, advanced=True)
-        
-        output_text = f"【Google 搜尋結果 - 關鍵字：{query}】\n"
+        # 為了節省 Token，我們只抓前 3 筆結果
+        results = google_search(query, num_results=3, advanced=True)
+        output_text = f"【Google 搜尋結果 - {query}】\n"
         count = 0
         for r in results:
             count += 1
-            output_text += f"{count}. 標題: {r.title}\n   摘要: {r.description}\n   連結: {r.url}\n\n"
+            output_text += f"{count}. {r.title}\n   {r.description}\n\n"
         
         if count == 0:
             return "未搜尋到相關結果。"
-            
         return output_text
     except Exception as e:
-        return f"Google 搜尋失敗: {e}"
+        return f"搜尋失敗: {e}"
 
 # ================= 6. 核心邏輯 =================
 
@@ -148,7 +138,6 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 使用 FastEmbed (輕量、CPU專用)
                         embeddings = FastEmbedEmbeddings()
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
@@ -174,8 +163,7 @@ with st.sidebar:
     st.divider()
     st.markdown("### 💡 使用範例")
     st.markdown("- 查股價：`2330.TW 股價`")
-    st.markdown("- 查新聞：`Google 搜尋 NVDA 最新新聞`")
-    st.markdown("- 綜合：(需上傳) `結合股價分析這份財報`")
+    st.markdown("- 查新聞：`Google 搜尋 NVDA`")
     
     st.markdown("") 
     if st.button("🔄 重置系統", type="primary", use_container_width=True, on_click=nuke_reset):
@@ -184,7 +172,7 @@ with st.sidebar:
 # ================= 聊天介面 =================
 
 if not st.session_state.messages:
-    st.info("👋 我是 AI 投資分析師，請下達指令。")
+    st.info("👋 我是 AI 投資分析師 (Llama 8B 版)，請下達指令。")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -196,12 +184,16 @@ if prompt := st.chat_input("請輸入問題..."):
 
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        message_placeholder.markdown("🤔 AI 正在思考與調用工具...")
+        message_placeholder.markdown("🤔 AI 正在思考...")
         
         try:
-            llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=0.1)
+            # 🌟 關鍵修改：換成 8B 小模型，避開 70B 的額度限制
+            llm = ChatGroq(
+                groq_api_key=GROQ_API_KEY, 
+                model_name="llama-3.1-8b-instant", # 改用這個！
+                temperature=0.1
+            )
             
-            # 定義工具
             tools = [
                 Tool(
                     name="Stock_Price",
@@ -209,9 +201,9 @@ if prompt := st.chat_input("請輸入問題..."):
                     description="輸入股票代碼(如 2330.TW)，回傳即時股價。"
                 ),
                 Tool(
-                    name="Google_Search", # 🌟 更新為 Google Search
+                    name="Google_Search",
                     func=get_google_news_func,
-                    description="用於搜尋最新的市場新聞、公司動態或網路資訊。輸入參數為搜尋關鍵字。"
+                    description="輸入搜尋關鍵字，回傳網路新聞。"
                 )
             ]
             
@@ -224,16 +216,15 @@ if prompt := st.chat_input("請輸入問題..."):
                     Tool(
                         name="Financial_Report_RAG",
                         func=qa.run,
-                        description="用於查詢使用者上傳的財報、PDF 文件內容。"
+                        description="用於查詢使用者上傳的財報內容。"
                     )
                 )
 
-            # 🌟 建立 Agent
             agent = initialize_agent(
                 tools, 
                 llm, 
                 agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-                verbose=False, # 關閉 verbose 避免 datetime 錯誤
+                verbose=False,
                 handle_parsing_errors=True
             )
             
@@ -244,3 +235,5 @@ if prompt := st.chat_input("請輸入問題..."):
             
         except Exception as e:
             st.error(f"❌ 錯誤: {e}")
+            if "429" in str(e):
+                st.warning("⚠️ 免費版額度已滿，請休息一下或換個帳號 API Key！")
