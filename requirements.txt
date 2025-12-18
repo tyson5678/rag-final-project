@@ -2,6 +2,7 @@ streamlit
 langchain==0.2.14
 langchain-community==0.2.12
 langchain-core==0.2.33
+langchain-groqo>=0.3.6
 langchain-google-genai>=1.0.3
 langchain-chroma
 chromadb
