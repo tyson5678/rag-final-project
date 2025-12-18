@@ -214,7 +214,7 @@ if prompt := st.chat_input("請輸入問題..."):
                 tools, 
                 llm, 
                 agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-                verbose=True,
+                verbose=False,
                 handle_parsing_errors=True # 容錯機制
             )
             
