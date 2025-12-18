@@ -21,7 +21,7 @@ st.set_page_config(
 )
 
 st.title("📈 AI 智能投資分析師")
-st.caption("🚀 Powered by Meta Llama 3.3 & Groq | FastEmbed & Latest LangChain")
+st.caption("🚀 Powered by Meta Llama 3.3 & Groq | Stable Version 0.2.14")
 
 # ================= 3. 匯入必要套件 =================
 try:
@@ -34,7 +34,7 @@ try:
     from langchain_community.vectorstores import Chroma
     from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
     
-    # 🌟 通用型 Agent (在新版 LangChain 中依然可用且穩定)
+    # 🌟 LangChain 0.2.x 依然支援 initialize_agent
     from langchain.agents import initialize_agent, AgentType, Tool
     from langchain_community.tools import DuckDuckGoSearchRun
     from langchain.chains import RetrievalQA
@@ -42,7 +42,7 @@ try:
     
 except ImportError as e:
     st.error(f"❌ 系統啟動失敗！原因: {e}")
-    st.info("💡 請確認 requirements.txt 已移除版本鎖定")
+    st.info("💡 請確認 requirements.txt 鎖定 langchain==0.2.14")
     st.stop()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -61,7 +61,7 @@ def get_stock_price_func(symbol: str):
         stock = yf.Ticker(symbol)
         info = stock.info
         currency = info.get('currency', 'USD')
-        # 多種可能的欄位抓取，增加成功率
+        # 多重欄位抓取，增加成功率
         price = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('ask') or 'N/A'
         return f"【{symbol}】現價: {price} {currency}"
     except Exception as e:
@@ -73,7 +73,7 @@ def get_news_func(query: str):
         search = DuckDuckGoSearchRun()
         return search.run(query)
     except Exception as e:
-        return f"新聞搜尋失敗: {e}"
+        return f"搜尋失敗: {e}"
 
 # ================= 6. 核心邏輯 =================
 
@@ -132,7 +132,7 @@ with st.sidebar:
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 使用 FastEmbed (輕量、CPU專用)
+                        # 使用 FastEmbed，穩定且輕量
                         embeddings = FastEmbedEmbeddings()
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
@@ -200,7 +200,7 @@ if prompt := st.chat_input("請輸入問題..."):
             ]
             
             if st.session_state.vector_db:
-                # 使用 RetrievalQA 包裝 RAG 工具
+                # 使用 RetrievalQA
                 qa = RetrievalQA.from_chain_type(
                     llm=llm,
                     retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 5})
@@ -213,13 +213,12 @@ if prompt := st.chat_input("請輸入問題..."):
                     )
                 )
 
-            # 🌟 關鍵：使用 initialize_agent，但環境是最新版 LangChain
-            # 這樣可以修復 datetime 錯誤，同時保持程式碼邏輯
+            # 🌟 0.2.14 版本：支援 initialize_agent 且修復了 datetime bug
             agent = initialize_agent(
                 tools, 
                 llm, 
                 agent=AgentType.STRUCTURED_CHAT_ZERO_SHOT_REACT_DESCRIPTION,
-                verbose=True, # 最新版這裡開 True 應該不會報錯了
+                verbose=False, # 關閉 verbose 以防萬一
                 handle_parsing_errors=True
             )
             
