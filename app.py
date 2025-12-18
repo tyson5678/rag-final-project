@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import uuid
+import datetime
 
 # ================= 1. 雲端資料庫修正 =================
 try:
@@ -14,32 +15,32 @@ except ImportError:
 
 # ================= 2. 頁面設定 =================
 st.set_page_config(
-    page_title="AI 深度知識庫", 
-    page_icon="🧠", 
+    page_title="AI 智能投資分析師", 
+    page_icon="📈", 
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-st.title("文件分析助手")
-st.caption("🚀 Powered by Meta Llama 3.3 & Groq | FastEmbed Engine (Stable)")
+st.title("📈 AI 智能投資分析師")
+st.caption("🚀 整合即時股價 (Yahoo Finance) + 網路新聞 + 財報深度分析 (RAG)")
 
-# ================= 3. 安全載入套件 (0.1.20 穩定版寫法) =================
+# ================= 3. 匯入必要套件 =================
 try:
     import langchain
     from langchain_groq import ChatGroq
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-    # 🌟 使用 FastEmbed (輕量、無 PyTorch、絕對穩定)
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
     from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-    # 🌟 使用舊版 Chroma 接口
-    from langchain_community.vectorstores import Chroma
-    # 🌟 使用最經典的 Chain (0.1.20 保證有這個)
-    from langchain.chains import RetrievalQA
-    from langchain.prompts import PromptTemplate
+    from langchain_chroma import Chroma
+    from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+    from langchain.agents import create_tool_calling_agent, AgentExecutor
+    from langchain_core.tools import tool
+    from langchain.tools.retriever import create_retriever_tool
+    from langchain_community.tools import DuckDuckGoSearchRun
+    import yfinance as yf # 財經套件
     
 except ImportError as e:
     st.error(f"❌ 系統啟動失敗！原因: {e}")
-    st.info("💡 請確認 requirements.txt 已鎖定 langchain==0.1.20")
     st.stop()
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -50,7 +51,38 @@ try:
 except:
     GROQ_API_KEY = "請填入Key"
 
-# ================= 5. 核心邏輯 =================
+# ================= 5. 定義工具 (Tools) =================
+
+@tool
+def get_stock_price(symbol: str):
+    """
+    獲取股票的即時股價資訊。
+    輸入參數 symbol 必須是股票代碼。
+    台股請加上 .TW (例如 2330.TW)，美股直接輸入代碼 (例如 NVDA, AAPL)。
+    """
+    try:
+        stock = yf.Ticker(symbol)
+        info = stock.info
+        # 抓取關鍵數據
+        current_price = info.get('currentPrice', 'N/A')
+        currency = info.get('currency', 'USD')
+        pe_ratio = info.get('trailingPE', 'N/A')
+        market_cap = info.get('marketCap', 'N/A')
+        
+        return f"【{symbol} 即時數據】\n現價: {current_price} {currency}\n本益比(P/E): {pe_ratio}\n市值: {market_cap}"
+    except Exception as e:
+        return f"查詢失敗: {e}，請確認股票代碼是否正確 (台股需加 .TW)。"
+
+@tool
+def get_company_news(query: str):
+    """
+    搜尋關於該公司的最新網路新聞或市場消息。
+    輸入參數 query 為搜尋關鍵字 (例如: '台積電 最新營收', 'NVDA news')。
+    """
+    search = DuckDuckGoSearchRun()
+    return search.run(query)
+
+# ================= 6. 核心邏輯 =================
 
 if "uploader_id" not in st.session_state:
     st.session_state.uploader_id = str(uuid.uuid4())
@@ -69,20 +101,22 @@ def nuke_reset():
     st.session_state.uploader_id = str(uuid.uuid4()) 
 
 with st.sidebar:
-    st.header("🗂️ 資料上傳")
+    st.header("🗂️ 財報/文件上傳 (選填)")
+    st.info("💡 你可以上傳公司的年報或財報 PDF，AI 會結合即時股價進行分析。")
     
     uploaded_files = st.file_uploader(
-        "上傳文件 (PDF / Word)", 
+        "上傳文件", 
         type=["pdf", "docx"], 
         accept_multiple_files=True,
         key=st.session_state.uploader_id 
     )
     
+    # 處理 RAG 邏輯
     current_files_sig = [(f.name, f.size) for f in uploaded_files] if uploaded_files else []
     
     if uploaded_files:
         if current_files_sig != st.session_state.processed_files:
-            with st.spinner("🧠 偵測到文件變動，正在重建資料庫 (FastEmbed)..."):
+            with st.spinner("🧠 正在讀取財報數據..."):
                 try:
                     all_splits = []
                     for uploaded_file in uploaded_files:
@@ -101,22 +135,14 @@ with st.sidebar:
                             continue
                             
                         docs = loader.load()
-                        for doc in docs:
-                            doc.metadata["source_filename"] = file_name
-                        
-                        text_splitter = RecursiveCharacterTextSplitter(
-                            chunk_size=800, 
-                            chunk_overlap=150,
-                            separators=["\n\n", "\n", "。", "！", "？", " ", ""]
-                        )
+                        text_splitter = RecursiveCharacterTextSplitter(chunk_size=800, chunk_overlap=150)
                         splits = text_splitter.split_documents(docs)
                         all_splits.extend(splits)
                         os.remove(tmp_path)
 
                     if all_splits:
-                        # 🌟 使用 FastEmbed，無需 GPU，無需下載龐大模型
+                        # 使用 FastEmbed
                         embeddings = FastEmbedEmbeddings()
-                        
                         unique_collection_name = f"collection_{uuid.uuid4()}"
                         
                         vector_db = Chroma.from_documents(
@@ -127,7 +153,7 @@ with st.sidebar:
                         
                         st.session_state.vector_db = vector_db
                         st.session_state.processed_files = current_files_sig
-                        st.toast(f"✅ 資料庫已重建！", icon="🔄")
+                        st.toast(f"✅ 財報資料庫建立完成！", icon="📊")
                     else:
                         st.warning("⚠️ 檔案內容為空")
                 except Exception as e:
@@ -139,85 +165,69 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    st.header("⚙️ 參數")
+    st.markdown("### 💡 使用範例")
+    st.markdown("- 查股價：`台積電(2330.TW) 現在股價多少？`")
+    st.markdown("- 查新聞：`最近 NVDA 有什麼大新聞？`")
+    st.markdown("- 綜合分析：(需上傳財報) `結合台積電的即時股價，分析這份財報中的毛利率風險。`")
     
-    temperature = st.slider("temperature（模型創意度）", 0.0, 1.0, 0.1, 0.1)
-    k_value = st.slider("k值（閱讀廣度）", 2, 20, 8)
-
-    st.markdown("")
-    if st.button("🗑️ 清空對話", use_container_width=True):
-        st.session_state.messages = []
-        st.rerun()
-        
     st.markdown("") 
-    if st.button("🔄 重置文件", type="primary", use_container_width=True, on_click=nuke_reset):
+    if st.button("🔄 重置對話與系統", type="primary", use_container_width=True, on_click=nuke_reset):
         pass
 
 # ================= 聊天介面 =================
 
 if not st.session_state.messages:
-    st.info("👋 請上傳文件開始使用。")
+    st.info("👋 我是你的 AI 投資分析師。我可以查股價、看新聞，也能解讀你上傳的財報。")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-if prompt := st.chat_input("請輸入問題..."):
+if prompt := st.chat_input("請輸入問題 (例如: 分析 2330.TW 的股價表現)..."):
     st.chat_message("user").markdown(prompt)
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    if st.session_state.vector_db:
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            try:
-                llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=temperature)
-                
-                # 🌟 使用舊版 PromptTemplate (穩定)
-                template = """
-                你是一個高階學術研究員。請根據以下【上下文】回答問題。
-                1. 若無相關資訊，請誠實回答「文件中未提及」。
-                2. 請用台灣繁體中文回答。
-                
-                【上下文】:
-                {context}
-                
-                【問題】:
-                {question}
-                """
-                QA_CHAIN_PROMPT = PromptTemplate.from_template(template)
-
-                # 🌟 使用 RetrievalQA (0.1.20 版核心)
-                qa_chain = RetrievalQA.from_chain_type(
-                    llm=llm,
-                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": k_value}),
-                    chain_type_kwargs={"prompt": QA_CHAIN_PROMPT},
-                    return_source_documents=True
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        message_placeholder.markdown("🤔 AI 正在分析市場數據與文件...")
+        
+        try:
+            # 1. 初始化 LLM
+            llm = ChatGroq(groq_api_key=GROQ_API_KEY, model_name="llama-3.3-70b-versatile", temperature=0.1)
+            
+            # 2. 準備工具箱 (Tools)
+            tools = [get_stock_price, get_company_news]
+            
+            # 如果有上傳文件，把 RAG 也變成一個工具加入工具箱！
+            if st.session_state.vector_db:
+                retriever = st.session_state.vector_db.as_retriever(search_kwargs={"k": 6})
+                retriever_tool = create_retriever_tool(
+                    retriever,
+                    "search_financial_report", # 工具名稱
+                    "搜尋使用者上傳的財報或文件內容。當問題涉及公司內部數據、財報細節或具體條款時，必須使用此工具。" # 工具說明
                 )
-                
-                # 執行
-                response = qa_chain.invoke({"query": prompt})
-                answer = response['result']
-                
-                message_placeholder.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
-                
-                # UI 優化：Tabs 分頁顯示
-                sources = response['source_documents']
-                if sources:
-                    with st.expander("📚 參考來源細節 (Reference Context)"):
-                        tabs = st.tabs([f"來源 {i+1}" for i in range(len(sources))])
-                        for i, tab in enumerate(tabs):
-                            with tab:
-                                doc = sources[i]
-                                source_name = doc.metadata.get("source_filename", "未知文件")
-                                page_num = doc.metadata.get("page", 0) + 1
-                                c1, c2 = st.columns([2, 1])
-                                with c1: st.markdown(f"**📄 文件：** `{source_name}`")
-                                with c2: st.markdown(f"**📌 頁數：** `第 {page_num} 頁`")
-                                st.info(doc.page_content)
-                
-            except Exception as e:
-                st.error(f"❌ 錯誤: {e}")
-    else:
-        with st.chat_message("assistant"):
-            st.warning("⚠️ 請先上傳文件，我才能回答問題喔！")
+                tools.append(retriever_tool)
+
+            # 3. 建立 Agent
+            prompt_template = ChatPromptTemplate.from_messages([
+                ("system", "你是一個專業的華爾街投資分析師。你的目標是結合『即時市場數據』(股價、新聞) 與 『使用者提供的內部文件』(若有)，提供深度且有憑有據的投資建議。請用繁體中文回答。"),
+                ("placeholder", "{chat_history}"),
+                ("human", "{input}"),
+                ("placeholder", "{agent_scratchpad}"),
+            ])
+            
+            agent = create_tool_calling_agent(llm, tools, prompt_template)
+            agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+            
+            # 4. 執行 Agent
+            # 注意：這裡不使用 invoke 的串流，直接拿結果比較穩定
+            response = agent_executor.invoke({"input": prompt})
+            answer = response['output']
+            
+            message_placeholder.markdown(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+            
+        except Exception as e:
+            st.error(f"❌ 分析過程發生錯誤: {e}")
+            if "API_KEY" in str(e):
+                st.warning("請檢查 Groq API Key 是否正確。")
