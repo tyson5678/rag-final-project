@@ -20,13 +20,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("💎 AI 智能投資分析師 (Gemini 版)")
-st.caption("🚀 Powered by Google Gemini 1.5 Flash | High Token Limit")
+st.title("💎 AI 智能投資分析師 (Gemini Pro)")
+st.caption("🚀 Powered by Google Gemini Pro | Stable & Free")
 
 # ================= 3. 匯入必要套件 =================
 try:
     import langchain
-    # 🌟 換成 Google 的模型
+    # 🌟 Google 模型套件
     from langchain_google_genai import ChatGoogleGenerativeAI
     
     from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
@@ -35,6 +35,7 @@ try:
     from langchain_community.vectorstores import Chroma
     from langchain.prompts import ChatPromptTemplate
     
+    # Agent 模組
     from langchain.agents import initialize_agent, AgentType, Tool
     from langchain.chains import RetrievalQA
     import yfinance as yf
@@ -47,11 +48,10 @@ except ImportError as e:
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 # ================= 4. API Key =================
-# 🌟 改抓 Google 的 Key
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except:
-    GOOGLE_API_KEY = "請填入Google_API_Key"
+    GOOGLE_API_KEY = "請填入Key"
 
 # ================= 5. 定義工具 (Tools) =================
 
@@ -168,7 +168,7 @@ with st.sidebar:
 # ================= 聊天介面 =================
 
 if not st.session_state.messages:
-    st.info("👋 我是 Gemini 投資助手，額度超大，請盡量問！")
+    st.info("👋 我是 Gemini Pro 投資助手，請下達指令。")
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -183,12 +183,12 @@ if prompt := st.chat_input("請輸入問題..."):
         message_placeholder.markdown("💎 Gemini 正在思考...")
         
         try:
-            # 🌟 核心修改：使用 Google Gemini 1.5 Flash
+            # 🌟 核心修改：改用最穩定的 'gemini-pro'
             llm = ChatGoogleGenerativeAI(
                 google_api_key=GOOGLE_API_KEY,
-                model="gemini-1.5-flash",
+                model="gemini-pro",  # <--- 這裡改了
                 temperature=0.1,
-                convert_system_message_to_human=True # 修正 Agent 格式問題
+                convert_system_message_to_human=True
             )
             
             tools = [
@@ -207,7 +207,7 @@ if prompt := st.chat_input("請輸入問題..."):
             if st.session_state.vector_db:
                 qa = RetrievalQA.from_chain_type(
                     llm=llm,
-                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 10}) # Gemini 可以讀更多，K 開大一點！
+                    retriever=st.session_state.vector_db.as_retriever(search_kwargs={"k": 5})
                 )
                 tools.append(
                     Tool(
