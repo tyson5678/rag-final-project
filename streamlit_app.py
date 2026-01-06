@@ -2,46 +2,79 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 from groq import Groq
-import json
 import os
 
 # ==========================================
-# 1. 設定與初始化
+# 1. 頁面設定與 CSS 美化 (UI 升級核心)
 # ==========================================
 st.set_page_config(
-    page_title="AI 智慧超市查詢",
-    page_icon="🛒",
-    layout="wide"
+    page_title="AI 智慧店長 - 數據查詢系統",
+    page_icon="🏪",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# 🔑 API Key 讀取邏輯 (修正版)
-# ------------------------------------------
-api_key = None # 初始化變數
+# 注入自定義 CSS 讓介面更有質感
+st.markdown("""
+<style>
+    /* 全域字體優化 */
+    .stApp {
+        font-family: 'Inter', '微軟正黑體', sans-serif;
+    }
+    
+    /* 聊天氣泡樣式優化 */
+    .stChatMessage {
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    }
+    
+    /* 表格樣式優化 */
+    .dataframe {
+        font-size: 0.9rem !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+    }
+    
+    /* 側邊欄標題 */
+    .css-1d391kg {
+        padding-top: 2rem;
+    }
+    
+    /* 關鍵指標卡片 (Metric) */
+    div[data-testid="stMetric"] {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+    
+    /* 隱藏 Streamlit 預設選單 */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
 
-# 優先嘗試從 Streamlit Secrets 讀取
+# ==========================================
+# 2. 安全 API Key 讀取
+# ==========================================
+api_key = None
 if "GROQ_API_KEY" in st.secrets:
     api_key = st.secrets["GROQ_API_KEY"]
-# 其次嘗試從環境變數讀取 (本地開發用)
 elif os.getenv("GROQ_API_KEY"):
     api_key = os.getenv("GROQ_API_KEY")
 
-# 檢查是否成功取得 Key
 if not api_key:
-    st.error("🚨 未偵測到 API Key！")
-    st.info("""
-        請檢查 Streamlit Cloud 的 Secrets 設定，或本地的 .streamlit/secrets.toml 檔案。
-        格式應為: GROQ_API_KEY = "gsk_xxxxxx"
-    """)
+    st.error("🚨 系統未偵測到 API Key")
+    st.info("請檢查 Streamlit Secrets 或環境變數設定。")
     st.stop()
 
-# 設定環境變數 (為了相容性)
-os.environ["GROQ_API_KEY"] = api_key
-
-# 初始化 Groq Client (⚠️ 這裡修正了：使用 api_key 變數)
 client = Groq(api_key=api_key)
 
 # ==========================================
-# 2. 建置真實的 SQLite 資料庫 (In-Memory)
+# 3. 初始化資料庫 (擴充版數據)
+# 模擬一家小型便利商店 (Mini Mart)
 # ==========================================
 @st.cache_resource
 def init_db():
@@ -59,17 +92,38 @@ def init_db():
         )
     ''')
     
+    # 擴充後的 30+ 筆模擬資料
     products_data = [
-        (1, "富士蘋果", "水果", 35, 120, "正常"),
-        (2, "金鑽鳳梨", "水果", 89, 8, "補貨中"),
-        (3, "巨峰葡萄", "水果", 150, 50, "正常"),
-        (4, "澳洲和牛M9", "肉類", 1200, 3, "缺貨"),
-        (5, "梅花豬肉片", "肉類", 220, 40, "正常"),
-        (6, "全脂鮮乳", "飲料", 92, 10, "補貨中"),
-        (7, "無糖綠茶", "飲料", 25, 200, "正常"),
-        (8, "厚切洋芋片", "零食", 45, 150, "正常"),
-        (9, "70%黑巧克力", "零食", 85, 0, "缺貨")
+        # 飲料類
+        (101, "可口可樂 600ml", "飲料", 35, 120, "正常"),
+        (102, "無糖綠茶", "飲料", 25, 200, "正常"),
+        (103, "全脂鮮乳", "飲料", 92, 8, "補貨中"),
+        (104, "拿鐵咖啡", "飲料", 55, 45, "正常"),
+        (105, "礦泉水", "飲料", 20, 300, "正常"),
+        (106, "燕麥奶", "飲料", 120, 15, "正常"),
+        # 零食類
+        (201, "洋芋片(原味)", "零食", 45, 80, "正常"),
+        (202, "義美小泡芙", "零食", 32, 100, "正常"),
+        (203, "70%黑巧克力", "零食", 89, 5, "補貨中"),
+        (204, "科學麵", "零食", 12, 500, "正常"),
+        (205, "綜合堅果", "零食", 150, 20, "正常"),
+        # 生鮮食品
+        (301, "御飯糰(鮪魚)", "生鮮", 35, 12, "正常"),
+        (302, "茶葉蛋", "生鮮", 13, 0, "缺貨"),
+        (303, "香蕉(根)", "生鮮", 20, 5, "補貨中"),
+        (304, "國民便當", "生鮮", 89, 8, "正常"),
+        (305, "雞胸肉", "生鮮", 59, 25, "正常"),
+        # 日用品
+        (401, "抽取式衛生紙", "日用品", 120, 60, "正常"),
+        (402, "3號電池(4入)", "日用品", 89, 30, "正常"),
+        (403, "輕便雨衣", "日用品", 40, 150, "正常"),
+        (404, "醫用口罩(盒)", "日用品", 199, 100, "正常"),
+        # 酒類
+        (501, "金牌啤酒", "酒類", 45, 200, "正常"),
+        (502, "紅酒", "酒類", 450, 10, "正常"),
+        (503, "威士忌", "酒類", 800, 3, "缺貨"),
     ]
+    
     c.executemany('INSERT INTO products VALUES (?,?,?,?,?,?)', products_data)
     conn.commit()
     return conn
@@ -77,40 +131,38 @@ def init_db():
 conn = init_db()
 
 # ==========================================
-# 3. 定義 Schema 與 AI Prompt
+# 4. AI 邏輯與 Prompt 設定
 # ==========================================
 DB_SCHEMA = """
 Table: products
 Columns:
-- id (INTEGER)
+- id (INTEGER): 商品編號
 - name (TEXT): 商品名稱
-- category (TEXT): 類別 ('水果', '肉類', '飲料', '零食')
-- price (INTEGER): 價格
-- stock (INTEGER): 庫存
-- status (TEXT): 狀態 ('正常', '缺貨', '補貨中')
+- category (TEXT): 類別 ('飲料', '零食', '生鮮', '日用品', '酒類')
+- price (INTEGER): 價格 (TWD)
+- stock (INTEGER): 庫存量
+- status (TEXT): 庫存狀態 ('正常', '缺貨', '補貨中')
 """
 
 SYSTEM_PROMPT = f"""
-你是一位 SQL 專家。將使用者的自然語言轉換為 SQLite 語法的 SQL 查詢。
+你是一位專業的資料庫管理員。請將使用者的自然語言轉換為 SQLite 語法的 SQL 查詢。
 
 【資料庫結構】
 {DB_SCHEMA}
 
-【規則】
-1. 只回傳 SQL 語句，不要有 Markdown (```sql) 或解釋。
-2. 確保語法符合 SQLite 標準。
-3. 如果使用者問「還有貨嗎」，代表 stock > 0。
-4. 如果使用者查詢模糊，請用 LIKE 或適當的數值比較。
-5. 只要 SELECT 語句，不要輸出分號結尾。
+【嚴格規則】
+1. 僅回傳 SQL 語句，**嚴禁**包含 Markdown (如 ```sql) 或任何解釋文字。
+2. 語法必須符合 standard SQLite。
+3. 若使用者查詢「缺貨」或「沒貨」，請使用 status = '缺貨' 或 stock = 0。
+4. 若使用者查詢「補貨」，請使用 status = '補貨中'。
+5. 模糊搜尋請用 LIKE '%關鍵字%'。
+6. 請勿輸出分號 (;) 結尾。
 """
 
-# ==========================================
-# 4. 核心功能函式
-# ==========================================
 def get_sql_from_llm(query):
     try:
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama-3.3-70b-versatile", # 使用最新的模型
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": query}
@@ -119,9 +171,8 @@ def get_sql_from_llm(query):
             max_tokens=200
         )
         sql = completion.choices[0].message.content.strip()
-        # 清理可能的回傳格式
-        sql = sql.replace("```sql", "").replace("```", "").replace("\n", " ").strip()
-        return sql
+        # 強制清理格式
+        return sql.replace("```sql", "").replace("```", "").replace("\n", " ").strip()
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -132,65 +183,101 @@ def execute_sql(sql):
         return None
 
 # ==========================================
-# 5. Streamlit UI 介面
+# 5. UI 佈局：側邊欄儀表板 (Dashboard)
 # ==========================================
 with st.sidebar:
-    st.header("🗄️ 資料庫預覽")
-    st.info("這是一個運行在記憶體中的 SQLite 真實資料庫。")
+    st.title("🏪 門市數據總覽")
+    
+    # 計算即時指標
     df_all = pd.read_sql_query("SELECT * FROM products", conn)
-    st.dataframe(df_all, use_container_width=True, hide_index=True)
+    total_products = len(df_all)
+    total_stock = df_all['stock'].sum()
+    low_stock_count = len(df_all[df_all['stock'] < 10])
+    
+    # 顯示指標卡片
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("總商品數", f"{total_products}", delta="SKU")
+    with col2:
+        st.metric("總庫存", f"{total_stock:,}")
+        
+    st.metric("⚠️ 低庫存/缺貨商品", f"{low_stock_count}", delta_color="inverse")
+    
     st.markdown("---")
-    st.markdown("### 💡 提示")
-    st.caption("試試看詢問：\n- 庫存最少的 3 樣商品\n- 算出水果類別的平均價格\n- 有哪些飲料正在補貨？")
+    st.subheader("📋 完整庫存清單")
+    # 使用 dataframe 顯示並隱藏索引，增加質感
+    st.dataframe(
+        df_all[['name', 'category', 'stock', 'status']], 
+        use_container_width=True, 
+        hide_index=True,
+        height=300
+    )
+    
+    st.markdown("---")
+    st.markdown("Made with ❤️ by Streamlit & Llama 3")
 
-st.title("🛒 AI 智慧超市查詢器 (Streamlit × Groq)")
-st.caption("Powered by Llama 3 & SQLite")
+# ==========================================
+# 6. UI 佈局：主聊天視窗
+# ==========================================
 
+# 標題區
+st.markdown("## 🤖 AI 智慧店長")
+st.markdown("請直接輸入中文查詢，例如：「**幫我查所有酒類的庫存**」或「**還有哪些東西缺貨？**」")
+
+# 初始化訊息紀錄
 if "messages" not in st.session_state:
     st.session_state.messages = [
-        {"role": "assistant", "content": "你好！我是你的數據助理。這裡連接著真實的 SQL 資料庫，你可以考考我更複雜的問題，例如「平均價格」或「排序」。"}
+        {"role": "assistant", "content": "店長你好！我是你的 AI 助理。今天想查詢什麼銷售數據？"}
     ]
 
+# 渲染歷史訊息
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if "sql" in msg:
-            st.code(msg["sql"], language="sql")
+            # 使用 expander 收合 SQL 代碼，讓介面更乾淨
+            with st.expander("查看生成的 SQL"):
+                st.code(msg["sql"], language="sql")
         if "data" in msg:
             st.dataframe(msg["data"], hide_index=True)
 
-if prompt := st.chat_input("請輸入查詢 (例如：列出價格大於 50 的水果)"):
+# 輸入區
+if prompt := st.chat_input("輸入查詢指令..."):
+    # 1. 使用者訊息
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
+    # 2. AI 處理
     with st.chat_message("assistant"):
-        with st.spinner("正在思考 SQL 邏輯..."):
+        message_placeholder = st.empty()
+        with st.spinner("AI 正在分析資料庫..."):
             sql_query = get_sql_from_llm(prompt)
             
             if sql_query.startswith("Error"):
-                st.error(f"API 連線失敗：{sql_query}")
+                st.error("連線錯誤，請稍後再試。")
             else:
-                st.markdown(f"已生成 SQL 查詢：")
-                st.code(sql_query, language="sql")
-                
+                # 執行查詢
                 result_df = execute_sql(sql_query)
                 
+                # 構建回應
                 if result_df is not None and not result_df.empty:
-                    st.success(f"查詢成功！找到 {len(result_df)} 筆資料。")
+                    st.success(f"✅ 查詢完成，共找到 {len(result_df)} 筆資料")
                     st.dataframe(result_df, hide_index=True)
+                    
+                    # 更新紀錄
                     st.session_state.messages.append({
                         "role": "assistant", 
-                        "content": "這是查詢結果：",
+                        "content": f"✅ 查詢完成，共找到 {len(result_df)} 筆資料",
                         "sql": sql_query,
                         "data": result_df
                     })
                 elif result_df is not None:
-                    st.warning("SQL 執行成功，但沒有找到符合條件的資料。")
+                    st.warning("⚠️ 語法執行成功，但未找到符合條件的商品。")
                     st.session_state.messages.append({
                         "role": "assistant",
-                        "content": "查無資料。",
+                        "content": "⚠️ 語法執行成功，但未找到符合條件的商品。",
                         "sql": sql_query
                     })
                 else:
-                    st.error("SQL 語法錯誤或無法執行。")
+                    st.error("❌ SQL 語法錯誤，無法執行。")
