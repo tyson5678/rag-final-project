@@ -49,27 +49,40 @@ st.markdown("""
         font-size: 1.5rem;
     }
 
-    div[data-testid="stMetric"] {
+    /* ★ 關鍵 CSS：把側邊欄的按鈕偽裝成 "指標卡片" ★ */
+    /* 這會影響側邊欄所有的 st.button */
+    section[data-testid="stSidebar"] .stButton button {
         background-color: #ffffff;
-        padding: 12px;
-        border-radius: 10px;
-        border: 1px solid var(--border-color);
-        border-left: 4px solid var(--primary-blue);
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px !important;
+        text-align: left !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: all 0.2s ease;
+        height: auto;
+        display: block; /* 讓內容換行 */
+        width: 100%;
+        border-left: 4px solid var(--primary-blue); /* 藍色裝飾條 */
+        color: #1e293b;
     }
     
-    div[data-testid="stMetric"][data-label*="缺貨"],
-    div[data-testid="stMetric"][data-label*="低水位"] {
-        border-left-color: var(--accent-orange) !important;
+    /* 滑鼠懸停特效 */
+    section[data-testid="stSidebar"] .stButton button:hover {
+        background-color: #f8fafc;
+        border-color: var(--primary-blue);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(15, 76, 129, 0.1);
+        color: var(--primary-blue);
     }
     
-    .stButton button {
-        border-radius: 8px;
+    /* 按鈕內的文字排版 */
+    section[data-testid="stSidebar"] .stButton button p {
+        font-size: 1rem;
         font-weight: 600;
-        border: 1px solid var(--border-color);
+        margin-bottom: 4px;
     }
-    
-    /* 聊天區塊優化 */
+
+    /* 聊天介面優化 */
     .stChatMessage {padding: 1rem 0; background: transparent;}
     div[data-testid="stChatMessageContent"] {
         background: #ffffff;
@@ -225,41 +238,46 @@ def generate_human_response(user_query, df, error=None):
         return "系統忙碌中..."
 
 # ==========================================
-# 5. UI 佈局
+# 5. UI 佈局 (Callback & Sidebar)
 # ==========================================
-
-# 定義按鈕回調函數 (Callback)
 def set_prompt(text):
     st.session_state.prompt_input = text
 
-# --- 側邊欄 ---
 with st.sidebar:
     st.markdown('<p class="sidebar-title">🏢 ShopAI <span style="color:#f36f21">Pro</span></p>', unsafe_allow_html=True)
     st.caption(f"Status: Online 🟢 | {datetime.date.today()}")
     
     df_all = pd.read_sql_query("SELECT * FROM products", conn)
     
-    # 靜態 KPI
-    with st.container():
-        st.markdown("**營運監控**")
-        c1, c2 = st.columns(2)
-        c1.metric("總 SKU", f"{len(df_all)}")
+    st.markdown("**營運監控 (Real-time KPIs)**")
+    
+    # 將按鈕偽裝成卡片 (CSS 已設定)
+    # 每個按鈕都綁定了 set_prompt，點擊後會自動執行查詢
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        # 1. 總 SKU -> 查詢所有商品
+        if st.button(f"📦 總 SKU\n\n{len(df_all)}", key="card_sku", use_container_width=True):
+            set_prompt("列出所有商品清單，並依照類別排序")
+            
+    with c2:
+        # 2. 庫存總值 -> 查詢分類價值
         val = (df_all['price'] * df_all['stock']).sum()
-        c2.metric("庫存總值", f"${val/1000:.1f}K")
-        
-    # 可點擊的 Alert Metrics (使用按鈕觸發查詢)
+        if st.button(f"💰 庫存總值\n\n${val/1000:.1f}K", key="card_val", use_container_width=True):
+            set_prompt("統計各類別的庫存總金額，並畫圖顯示")
+
     c3, c4 = st.columns(2)
     with c3:
+         # 3. 缺貨品項 -> 查詢缺貨
          missing = len(df_all[df_all['status'] == '缺貨'])
-         st.metric("缺貨品項", f"{missing}", delta="Action", delta_color="inverse")
-         if st.button("🔍 查看", key="btn_missing", use_container_width=True):
-             set_prompt("列出所有缺貨的商品")
+         if st.button(f"🚨 缺貨品項\n\n{missing}", key="card_missing", use_container_width=True):
+             set_prompt("列出所有缺貨或補貨中的商品")
              
     with c4:
+         # 4. 低水位 -> 查詢低庫存
          low = len(df_all[df_all['stock'] < 10])
-         st.metric("低水位", f"{low}", delta="Alert", delta_color="inverse")
-         if st.button("🔍 查看", key="btn_low", use_container_width=True):
-             set_prompt("列出庫存低於 10 的商品")
+         if st.button(f"⚠️ 低水位\n\n{low}", key="card_low", use_container_width=True):
+             set_prompt("列出庫存低於 10 的商品，並依照庫存量由少到多排序")
 
     st.markdown("---")
     st.markdown("**快速操作**")
