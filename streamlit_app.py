@@ -255,7 +255,7 @@ with st.sidebar:
     
     c1, c2 = st.columns(2)
     with c1:
-        if st.button(f"📦 總 SKU\n\n{len(df_all)}", key="card_sku", use_container_width=True):
+        if st.button(f"📦 品項數量\n\n{len(df_all)}", key="card_sku", use_container_width=True):
             set_prompt("列出所有商品清單，並依照類別排序")
             
     with c2:
