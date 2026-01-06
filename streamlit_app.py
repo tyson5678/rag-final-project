@@ -3,24 +3,35 @@ import pandas as pd
 import sqlite3
 from groq import Groq
 import json
+import os
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # ==========================================
 # 1. 設定與初始化
 # ==========================================
 st.set_page_config(
-    page_title="AI 智慧超市查詢 (Streamlit 版)",
+    page_title="AI 智慧超市查詢",
     page_icon="🛒",
     layout="wide"
 )
 
 # 取得 API Key
-# 最佳實踐：在 Streamlit Community Cloud 的 "Secrets" 設定中加入 GROQ_API_KEY
-# 這裡為了讓你方便測試，我們先嘗試從 Secrets 讀取，如果沒有則使用你提供的 Key
-try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-except:
-    # ⚠️ 注意：推送到 GitHub 前，建議移除這行硬編碼的 Key，改用 Streamlit Secrets
-    GROQ_API_KEY = "your-groq-api-key-here"
+# 1. 檢查 Secrets 是否存在且包含正確的 Key
+if "GROQ_API_KEY" in st.secrets:
+    api_key = st.secrets["GROQ_API_KEY"]
+    
+    # 將 Key 設定為環境變數 (這是為了 LangChain)
+    os.environ["GROQ_API_KEY"] = api_key
+else:
+    # 如果讀不到 Key，顯示友善的錯誤訊息並停止執行
+    st.error("🚨 未偵測到 API Key！")
+    st.info("""
+        **如何修復：**
+        1. 若在 **Streamlit Cloud**: 請到 App Settings -> Secrets，貼上：
+           `GROQ_API_KEY = "你的_gsk_開頭的key"`
+        2. 若在 **本地執行**: 請在專案根目錄建立 `.streamlit/secrets.toml` 檔案，並貼上同樣內容。
+    """)
+    st.stop() # 停止程式往下執行，避免報錯
 
 # 初始化 Groq Client
 client = Groq(api_key=GROQ_API_KEY)
