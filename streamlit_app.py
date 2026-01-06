@@ -313,13 +313,13 @@ for msg in st.session_state.messages:
 st.markdown("###### 💡 快速提問：")
 col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
 with col_chip1:
-    if st.button("🏆 庫存最多", use_container_width=True): set_prompt("庫存最多的前 5 名商品")
+    if st.button("🏆 庫存最多", use_container_width=True): set_prompt("庫存最多的前 10 名商品")
 with col_chip2:
     if st.button("🚨 缺貨清單", use_container_width=True): set_prompt("列出所有缺貨或補貨中的商品")
 with col_chip3:
-    if st.button("💰 價值最高", use_container_width=True): set_prompt("依據單價從高到低列出酒類")
+    if st.button("💰 價值最高", use_container_width=True): set_prompt("依據單價從高到低列出所有商品")
 with col_chip4:
-    if st.button("🥤 飲料概況", use_container_width=True): set_prompt("統計飲料類別的平均價格與總庫存")
+    if st.button("🥤 飲料概況", use_container_width=True): set_prompt("統計飲料類別的完整明細")
 
 # 處理 Prompt 邏輯
 default_prompt = st.session_state.pop("prompt_input", "")
