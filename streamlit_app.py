@@ -261,13 +261,13 @@ with st.sidebar:
     with c2:
         val = (df_all['price'] * df_all['stock']).sum()
         if st.button(f"💰 庫存總值\n\n${val/1000:.1f}K", key="card_val", use_container_width=True):
-            set_prompt("統計各類別的庫存總金額，並畫圖顯示")
+            set_prompt("統計各類別的庫存總金額")
 
     c3, c4 = st.columns(2)
     with c3:
          missing = len(df_all[df_all['status'] == '缺貨'])
          if st.button(f"🚨 缺貨品項\n\n{missing}", key="card_missing", use_container_width=True):
-             set_prompt("列出所有缺貨或補貨中的商品")
+             set_prompt("列出所有缺貨的商品")
              
     with c4:
          low = len(df_all[df_all['stock'] < 10])
