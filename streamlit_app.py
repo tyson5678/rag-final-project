@@ -51,17 +51,13 @@ st.markdown("""
 
     div[data-testid="stMetric"] {
         background-color: #ffffff;
-        padding: 16px;
+        padding: 12px;
         border-radius: 10px;
         border: 1px solid var(--border-color);
         border-left: 4px solid var(--primary-blue);
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        transition: transform 0.2s ease;
     }
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 16px rgba(15, 76, 129, 0.1);
-    }
+    
     div[data-testid="stMetric"][data-label*="缺貨"],
     div[data-testid="stMetric"][data-label*="低水位"] {
         border-left-color: var(--accent-orange) !important;
@@ -73,14 +69,8 @@ st.markdown("""
         border: 1px solid var(--border-color);
     }
     
-    /* 快捷按鈕樣式 */
-    div.row-widget.stButton > button {
-        width: 100%;
-        text-align: left;
-    }
-
+    /* 聊天區塊優化 */
     .stChatMessage {padding: 1rem 0; background: transparent;}
-    
     div[data-testid="stChatMessageContent"] {
         background: #ffffff;
         border: 1px solid var(--border-color);
@@ -89,7 +79,6 @@ st.markdown("""
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         color: #1e293b;
     }
-
     div[data-testid="stChatMessage"]:nth-child(odd) div[data-testid="stChatMessageContent"] {
         background: var(--primary-blue);
         color: white;
@@ -171,7 +160,7 @@ def init_db():
 conn = init_db()
 
 # ==========================================
-# 4. Agentic AI 核心 (具備自癒能力)
+# 4. Agentic AI 核心
 # ==========================================
 DB_SCHEMA = """
 Table: products
@@ -179,10 +168,9 @@ Columns: sku, name, category, price, stock, status ('正常', '缺貨', '補貨�
 """
 
 def generate_sql(query, error_msg=None):
-    # 如果有錯誤訊息，代表是「重試模式」，加入錯誤提示
     instruction = ""
     if error_msg:
-        instruction = f"\n⚠️ PREVIOUS SQL FAILED with error: {error_msg}. Please FIX the SQL."
+        instruction = f"\n⚠️ PREVIOUS SQL FAILED: {error_msg}. FIX IT."
     
     system_prompt = f"""
     You are a SQLite expert. Schema: {DB_SCHEMA}
@@ -202,17 +190,13 @@ def generate_sql(query, error_msg=None):
     except:
         return None
 
-# ★ 新增：具備自癒能力的 SQL 執行器
 def execute_sql_safe(sql, user_query):
     try:
         return pd.read_sql_query(sql, conn), None
     except Exception as e:
-        # 第一次失敗，嘗試自我修復 (Self-Correction)
-        print(f"SQL Failed: {e}, Retrying...")
         new_sql = generate_sql(user_query, error_msg=str(e))
         if new_sql:
             try:
-                # 第二次嘗試
                 return pd.read_sql_query(new_sql, conn), new_sql
             except Exception as e2:
                 return None, f"Retry failed: {e2}"
@@ -220,7 +204,7 @@ def execute_sql_safe(sql, user_query):
 
 def generate_human_response(user_query, df, error=None):
     if error:
-        return f"⚠️ 系統無法理解您的查詢，請換個方式問問看。(Error: {error})"
+        return f"⚠️ 系統無法理解您的查詢。(Error: {error})"
     if df is None or df.empty:
         data_context = "查詢結果：無資料。"
     else:
@@ -244,13 +228,18 @@ def generate_human_response(user_query, df, error=None):
 # 5. UI 佈局
 # ==========================================
 
-# --- 側邊欄 Part 1 ---
+# 定義按鈕回調函數 (Callback)
+def set_prompt(text):
+    st.session_state.prompt_input = text
+
+# --- 側邊欄 ---
 with st.sidebar:
     st.markdown('<p class="sidebar-title">🏢 ShopAI <span style="color:#f36f21">Pro</span></p>', unsafe_allow_html=True)
     st.caption(f"Status: Online 🟢 | {datetime.date.today()}")
     
     df_all = pd.read_sql_query("SELECT * FROM products", conn)
     
+    # 靜態 KPI
     with st.container():
         st.markdown("**營運監控**")
         c1, c2 = st.columns(2)
@@ -258,9 +247,19 @@ with st.sidebar:
         val = (df_all['price'] * df_all['stock']).sum()
         c2.metric("庫存總值", f"${val/1000:.1f}K")
         
+    # 可點擊的 Alert Metrics (使用按鈕觸發查詢)
     c3, c4 = st.columns(2)
-    c3.metric("缺貨", f"{len(df_all[df_all['status']=='缺貨'])}", delta="Action", delta_color="inverse")
-    c4.metric("低水位", f"{len(df_all[df_all['stock']<10])}", delta="Alert", delta_color="inverse")
+    with c3:
+         missing = len(df_all[df_all['status'] == '缺貨'])
+         st.metric("缺貨品項", f"{missing}", delta="Action", delta_color="inverse")
+         if st.button("🔍 查看", key="btn_missing", use_container_width=True):
+             set_prompt("列出所有缺貨的商品")
+             
+    with c4:
+         low = len(df_all[df_all['stock'] < 10])
+         st.metric("低水位", f"{low}", delta="Alert", delta_color="inverse")
+         if st.button("🔍 查看", key="btn_low", use_container_width=True):
+             set_prompt("列出庫存低於 10 的商品")
 
     st.markdown("---")
     st.markdown("**快速操作**")
@@ -272,7 +271,7 @@ with st.sidebar:
     st.markdown("---")
 
 # --- 主畫面 ---
-st.markdown("#### 👋 老闆，歡迎回到戰情室～")
+st.markdown("#### 👋 歡迎回到戰情室，店長。")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "系統已連線。您可以查詢全店 60+ 項商品的即時庫存狀態。"}]
@@ -287,12 +286,7 @@ for msg in st.session_state.messages:
                 if len(msg["data"]) > 1 and "stock" in msg["data"].columns:
                     st.bar_chart(msg["data"].set_index("name")["stock"], color="#0f4c81")
 
-# ★ 新增：快速提問按鈕區 (Suggestion Chips)
-# -----------------------------------------------------
-# 定義一個處理按鈕點擊的 callback
-def set_prompt(text):
-    st.session_state.prompt_input = text
-
+# 快捷膠囊按鈕
 st.markdown("###### 💡 快速提問：")
 col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
 with col_chip1:
@@ -304,14 +298,11 @@ with col_chip3:
 with col_chip4:
     if st.button("🥤 飲料概況", use_container_width=True): set_prompt("統計飲料類別的平均價格與總庫存")
 
-# 檢查是否有來自按鈕的輸入
+# 處理 Prompt 邏輯
 default_prompt = st.session_state.pop("prompt_input", "")
 
-# 輸入框
 if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or default_prompt:
-    # 處理 prompt 來自按鈕的情況 (如果是按鈕觸發，雖然 chat_input 為空，但 default_prompt 有值)
-    if not prompt and default_prompt:
-        prompt = default_prompt
+    if not prompt and default_prompt: prompt = default_prompt
 
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👨‍💼"):
@@ -319,24 +310,16 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
 
     with st.chat_message("assistant", avatar="🤖"):
         with st.spinner("AI 分析師正在處理數據..."):
-            
-            # 1. 生成 SQL
             sql = generate_sql(prompt)
             result = None
             error = None
             final_sql = sql
             
             if sql:
-                # 2. 執行 SQL (使用具備自癒能力的 safe function)
                 result, err_or_new_sql = execute_sql_safe(sql, prompt)
-                
-                if result is None:
-                    error = err_or_new_sql # 真的失敗了
-                elif err_or_new_sql: 
-                    # 雖然 result 成功，但代表經過了修復，err_or_new_sql 是新的 SQL
-                    final_sql = err_or_new_sql
+                if result is None: error = err_or_new_sql
+                elif err_or_new_sql: final_sql = err_or_new_sql
             
-            # 3. 生成回覆
             reply = generate_human_response(prompt, result, error)
             st.markdown(reply)
             
@@ -344,7 +327,7 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
                 "role": "assistant",
                 "content": reply,
                 "data": result,
-                "sql": final_sql, # 記錄最終成功的 SQL
+                "sql": final_sql,
                 "query": prompt 
             })
             
@@ -355,11 +338,10 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
                      if "stock" in result.columns:
                         st.bar_chart(result.set_index("name")["stock"], color="#0f4c81")
     
-    # 強制重新執行以更新畫面 (確保按鈕觸發後訊息能顯示)
     if default_prompt:
         st.rerun()
 
-# --- 側邊欄 Part 2 (Audit Log) ---
+# --- 側邊欄 Part 2 (SQL Log) ---
 with st.sidebar:
     st.markdown("**🛠️ SQL 執行歷程**")
     log_container = st.container(height=250)
