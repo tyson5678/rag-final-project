@@ -23,11 +23,9 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
 
     :root {
-        /* 企業藍橘配色系統 */
-        --primary-blue: #0f4c81;       /* 穩重深藍 (Header, Primary Text) */
-        --accent-orange: #f36f21;      /* 活力橘 (Highlights, Buttons) */
+        --primary-blue: #0f4c81;       /* 穩重深藍 */
+        --accent-orange: #f36f21;      /* 活力橘 */
         --background-light: #f8fafc;   /* 淺灰背景 */
-        --card-bg: #ffffff;
         --border-color: #e2e8f0;
     }
 
@@ -42,8 +40,6 @@ st.markdown("""
         background: transparent !important;
         backdrop-filter: blur(0px);
     }
-    
-    /* 隱藏預設 Footer */
     footer {display: none !important;}
     #MainMenu {visibility: hidden;}
 
@@ -54,7 +50,6 @@ st.markdown("""
         box-shadow: 4px 0 24px rgba(0,0,0,0.02);
     }
     
-    /* 側邊欄標題 */
     .sidebar-title {
         color: var(--primary-blue);
         font-weight: 800;
@@ -68,26 +63,23 @@ st.markdown("""
         border-radius: 10px;
         border: 1px solid var(--border-color);
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        border-left: 4px solid var(--primary-blue); /* 左側藍色裝飾條 */
+        border-left: 4px solid var(--primary-blue);
         transition: transform 0.2s ease;
     }
     div[data-testid="stMetric"]:hover {
         transform: translateY(-2px);
         box-shadow: 0 8px 16px rgba(15, 76, 129, 0.1);
     }
-    
-    /* 特殊卡片：警示類用橘色 */
     div[data-testid="stMetric"][data-label*="缺貨"],
     div[data-testid="stMetric"][data-label*="低水位"] {
         border-left-color: var(--accent-orange) !important;
     }
     
-    /* 按鈕樣式優化 (橘色強調) */
+    /* 按鈕樣式優化 */
     .stButton button {
         border-radius: 8px;
         font-weight: 600;
         border: 1px solid var(--border-color);
-        transition: all 0.2s;
     }
     .stButton button:hover {
         border-color: var(--accent-orange);
@@ -101,7 +93,6 @@ st.markdown("""
         background: transparent;
     }
     
-    /* AI 回覆卡片 */
     div[data-testid="stChatMessageContent"] {
         background: #ffffff;
         border: 1px solid var(--border-color);
@@ -111,39 +102,12 @@ st.markdown("""
         color: #1e293b;
     }
 
-    /* 用戶回覆樣式 (深藍色背景) */
     div[data-testid="stChatMessage"]:nth-child(odd) div[data-testid="stChatMessageContent"] {
         background: var(--primary-blue);
         color: white;
         border: none;
         border-radius: 16px 0 16px 16px;
         box-shadow: 0 4px 12px rgba(15, 76, 129, 0.3);
-    }
-    
-    /* SQL Log Container in Sidebar */
-    .sql-log-container {
-        background-color: #f1f5f9;
-        border-radius: 8px;
-        padding: 10px;
-        border: 1px solid #cbd5e1;
-        font-family: 'Monaco', 'Consolas', monospace;
-        font-size: 0.8rem;
-        margin-bottom: 8px;
-    }
-    
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        height: 40px;
-        border-radius: 4px;
-        color: #64748b;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #eff6ff;
-        color: var(--primary-blue);
-        font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -164,7 +128,7 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 # ==========================================
-# 3. 資料庫初始化 (真實超商模擬 - 60+ SKU)
+# 3. 資料庫初始化
 # ==========================================
 @st.cache_resource
 def init_db():
@@ -289,7 +253,7 @@ def generate_human_response(user_query, df, error=None):
 # 5. UI 佈局 (企業級儀表板)
 # ==========================================
 
-# --- 側邊欄 (Sidebar) ---
+# --- 側邊欄 (Sidebar PART 1: 固定靜態內容) ---
 with st.sidebar:
     # 品牌識別區
     st.markdown('<p class="sidebar-title">🏢 ShopAI <span style="color:#f36f21">Pro</span></p>', unsafe_allow_html=True)
@@ -317,7 +281,7 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # === 功能按鈕區 (使用橘色強調) ===
+    # 功能按鈕區
     st.markdown("**快速操作**")
     csv = df_all.to_csv(index=False).encode('utf-8')
     st.download_button("📊 匯出報表 (CSV)", csv, f"report_{datetime.date.today()}.csv", "text/csv", use_container_width=True)
@@ -328,40 +292,16 @@ with st.sidebar:
         st.toast("✅ 數據同步完成！", icon="🎉")
     
     st.markdown("---")
-    
-    # === 新增功能：SQL 執行歷程 (Audit Log) ===
-    st.markdown("**🛠️ SQL 執行歷程 (Audit Log)**")
-    st.caption("顯示最近的 AI 推論邏輯")
-    
-    # 使用 Container 建立可滾動的日誌區
-    log_container = st.container(height=250)
-    
-    # 如果有歷史訊息，反轉順序顯示（最新的在最上面）
-    if "messages" in st.session_state:
-        # 篩選出機器人的回應且包含 SQL 的訊息
-        sql_logs = [m for m in st.session_state.messages if m["role"] == "assistant" and "sql" in m]
-        
-        with log_container:
-            if not sql_logs:
-                st.info("尚無執行紀錄")
-            else:
-                for log in reversed(sql_logs):
-                    # 顯示對應的問題 (需要從 context 找，這裡簡化直接顯示 SQL)
-                    st.markdown(f"""
-                    <div style="background:#f1f5f9; padding:8px; border-radius:6px; margin-bottom:8px; border-left:3px solid #f36f21;">
-                        <div style="font-size:0.75rem; color:#64748b; margin-bottom:4px;">Generated SQL</div>
-                        <code style="font-size:0.7rem; color:#0f4c81;">{log['sql']}</code>
-                    </div>
-                    """, unsafe_allow_html=True)
 
 # --- 主畫面 ---
-st.markdown("#### 👋 歡迎回到戰情室，店長。")
+st.markdown("#### 👋 老闆，歡迎回到戰情室～～")
 
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "系統已連線。您可以查詢全店 60+ 項商品的即時庫存狀態。"}
     ]
 
+# 顯示對話紀錄
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="👨‍💼" if msg["role"]=="user" else "🤖"):
         st.markdown(msg["content"])
@@ -380,8 +320,9 @@ for msg in st.session_state.messages:
                 )
             with tab2:
                 if len(msg["data"]) > 1 and "stock" in msg["data"].columns:
-                    st.bar_chart(msg["data"].set_index("name")["stock"], color="#0f4c81") # 使用企業藍
+                    st.bar_chart(msg["data"].set_index("name")["stock"], color="#0f4c81")
 
+# 輸入處理
 if prompt := st.chat_input("請輸入查詢指令..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👨‍💼"):
@@ -401,7 +342,7 @@ if prompt := st.chat_input("請輸入查詢指令..."):
             reply = generate_human_response(prompt, result, error)
             st.markdown(reply)
             
-            # 這裡我們把 prompt (使用者的問題) 也存進去，方便日誌對照（雖然目前日誌只顯示 SQL）
+            # 將本次查詢存入 session_state
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": reply,
@@ -425,3 +366,29 @@ if prompt := st.chat_input("請輸入查詢指令..."):
                 with tab2:
                      if "stock" in result.columns:
                         st.bar_chart(result.set_index("name")["stock"], color="#0f4c81")
+
+# ==========================================
+# 6. 側邊欄 PART 2: SQL 日誌 (移到最底端渲染！)
+# 關鍵修改：這段程式碼現在放在所有邏輯處理之後
+# ==========================================
+with st.sidebar:
+    st.markdown("**🛠️ SQL 執行歷程 (Audit Log)**")
+    st.caption("顯示最近的 AI 推論邏輯")
+    
+    log_container = st.container(height=250)
+    
+    if "messages" in st.session_state:
+        # 篩選並反轉顯示
+        sql_logs = [m for m in st.session_state.messages if m["role"] == "assistant" and "sql" in m]
+        
+        with log_container:
+            if not sql_logs:
+                st.info("尚無執行紀錄")
+            else:
+                for log in reversed(sql_logs):
+                    st.markdown(f"""
+                    <div style="background:#f1f5f9; padding:8px; border-radius:6px; margin-bottom:8px; border-left:3px solid #f36f21;">
+                        <div style="font-size:0.75rem; color:#64748b; margin-bottom:4px;">Generated SQL</div>
+                        <code style="font-size:0.7rem; color:#0f4c81;">{log['sql']}</code>
+                    </div>
+                    """, unsafe_allow_html=True)
