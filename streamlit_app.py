@@ -6,16 +6,16 @@ import os
 import json
 
 # ==========================================
-# 1. 介面設計與 CSS 注入 (讓 UI 變專業)
+# 1. 介面設計與 CSS 注入 (修正側邊欄按鈕消失問題)
 # ==========================================
 st.set_page_config(
     page_title="ShopAI - 智慧零售助手",
     page_icon="🛍️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded" # 預設展開側邊欄
 )
 
-# 專業級 CSS 樣式
+# 專業級 CSS 樣式 (修正版)
 st.markdown("""
 <style>
     /* 引入現代字體 */
@@ -25,10 +25,22 @@ st.markdown("""
         font-family: 'Noto Sans TC', sans-serif;
     }
 
-    /* 隱藏預設 Header 和 Footer */
+    /* 隱藏預設 Footer 和漢堡選單 (右上的三點)，但保留 Header 以便顯示側邊欄按鈕 */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    
+    /* 關鍵修正：不要隱藏 header，改為讓它變透明或與背景融合。
+       這樣左上角的 ">" 箭頭按鈕才會出現！
+    */
+    header {
+        visibility: visible !important;
+        background-color: transparent !important;
+    }
+    
+    /* 移除 Header 的裝飾線 (如果你不想看到彩色的線) */
+    [data-testid="stDecoration"] {
+        display: none;
+    }
 
     /* 側邊欄美化 */
     [data-testid="stSidebar"] {
@@ -64,12 +76,6 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
     
-    /* 標題樣式 */
-    h1, h2, h3 {
-        color: #2d3748;
-        font-weight: 700;
-    }
-    
     /* 自定義按鈕 */
     .stButton button {
         border-radius: 20px;
@@ -94,7 +100,7 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 # ==========================================
-# 3. 資料庫初始化 (擴充商品資料)
+# 3. 資料庫初始化 (維持擴充版數據)
 # ==========================================
 @st.cache_resource
 def init_db():
@@ -107,7 +113,6 @@ def init_db():
         )
     ''')
     
-    # 35 筆豐富資料
     products_data = [
         (101, "可口可樂 600ml", "飲料", 35, 120, "正常"),
         (102, "原萃綠茶", "飲料", 25, 200, "正常"),
@@ -142,14 +147,13 @@ def init_db():
 conn = init_db()
 
 # ==========================================
-# 4. 雙階段 AI 核心 (SQL + 人性化回覆)
+# 4. 雙階段 AI 核心 (維持人性化邏輯)
 # ==========================================
 DB_SCHEMA = """
 Table: products
 Columns: id, name, category, price, stock, status ('正常', '缺貨', '補貨中')
 """
 
-# 階段一：生成 SQL
 def generate_sql(query):
     system_prompt = f"""
     You are a SQL expert. Convert user question to SQLite query.
@@ -170,19 +174,14 @@ def generate_sql(query):
     except:
         return None
 
-# 階段二：人性化解讀 (關鍵優化！)
 def generate_human_response(user_query, sql_result_df, sql_error=None):
-    # 取得目前資料庫概況 (讓 AI 知道我們到底賣什麼，以便推薦)
-    # 為了省 token，我們只抓取類別和前幾項熱門商品當作 Context
     available_categories = "飲料, 零食, 生鮮, 日用品, 酒類"
     
-    # 構建 Prompt
     if sql_error:
         data_context = f"SQL Execution Failed: {sql_error}"
     elif sql_result_df is None or sql_result_df.empty:
         data_context = "Query returned NO DATA (Empty Result)."
     else:
-        # 將結果轉為字串給 AI 讀
         data_context = f"Query Results:\n{sql_result_df.to_string(index=False)}"
 
     system_prompt = f"""
@@ -197,12 +196,11 @@ def generate_human_response(user_query, sql_result_df, sql_error=None):
     
     【回答策略】
     1. **如果有資料**：直接總結數據。例如「目前庫存還有 120 個，價格是 35 元。」
-    2. **如果沒有資料 (Empty Result)**：這很重要！
+    2. **如果沒有資料 (Empty Result)**：
        - **不要**說「查無資料」。
        - **要說**：「很抱歉，我們目前沒有這項商品。」
        - **然後主動推薦**：根據使用者的問題，從我們的類別 ({available_categories}) 中推薦替代品。
-       - 例如：如果他問「紅茶」，你要回「我們沒有紅茶，但我們有原萃綠茶和咖啡，您要參考嗎？」
-    3. **語氣**：專業、有禮貌、像真人對話。不要像機器人。
+    3. **語氣**：專業、有禮貌、像真人對話。
     4. **格式**：不要使用 markdown 表格，用自然語言敘述即可。
     """
 
@@ -210,7 +208,7 @@ def generate_human_response(user_query, sql_result_df, sql_error=None):
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "system", "content": system_prompt}],
-            temperature=0.7, # 稍微提高溫度，讓回答更自然
+            temperature=0.7,
             max_tokens=300
         )
         return completion.choices[0].message.content
@@ -218,18 +216,17 @@ def generate_human_response(user_query, sql_result_df, sql_error=None):
         return "系統忙碌中，請稍後再試。"
 
 # ==========================================
-# 5. UI 佈局
+# 5. UI 佈局 (維持 Dashboard 設計)
 # ==========================================
 
-# 側邊欄：精緻儀表板
+# 側邊欄
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3081/3081559.png", width=60)
     st.title("ShopAI 儀表板")
-    st.markdown("Ver 2.0 Pro")
+    st.markdown("Ver 2.1 Fixed")
     
     st.markdown("---")
     
-    # 即時計算指標
     df_all = pd.read_sql_query("SELECT * FROM products", conn)
     
     col1, col2 = st.columns(2)
@@ -257,36 +254,27 @@ st.markdown("## 👋 您好，我是您的 AI 智慧店長")
 st.markdown("您可以問我任何關於庫存、價格或銷售的問題。")
 st.markdown("---")
 
-# 初始化訊息
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "歡迎光臨！今天想查點什麼？我可以幫您找商品、查價格，或是看看什麼東西快賣完了。"}
     ]
 
-# 顯示歷史訊息
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="🧑‍💻" if msg["role"]=="user" else "🤖"):
         st.markdown(msg["content"])
-        # 如果有詳細數據表格，顯示在折疊區塊中，保持對話乾淨
         if "data" in msg and msg["data"] is not None and not msg["data"].empty:
             with st.expander("📊 查看詳細數據表"):
                 st.dataframe(msg["data"], hide_index=True, use_container_width=True)
 
-# 輸入區
 if prompt := st.chat_input("請輸入查詢 (例如：有沒有賣紅茶？)"):
-    # 1. 用戶輸入
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="🧑‍💻"):
         st.markdown(prompt)
 
-    # 2. AI 處理中
     with st.chat_message("assistant", avatar="🤖"):
         with st.spinner("店長正在查詢庫存..."):
             
-            # Step A: 生成 SQL
             sql_query = generate_sql(prompt)
-            
-            # Step B: 執行 SQL
             result_df = None
             sql_error = None
             
@@ -296,19 +284,14 @@ if prompt := st.chat_input("請輸入查詢 (例如：有沒有賣紅茶？)"):
                 except Exception as e:
                     sql_error = str(e)
             
-            # Step C: 生成人類回覆 (Humanize)
-            # 這是新的關鍵步驟：把 SQL 結果餵給 AI，讓它講人話
             human_reply = generate_human_response(prompt, result_df, sql_error)
             
-            # 顯示回覆
             st.markdown(human_reply)
             
-            # 如果有數據，提供展開選項
             if result_df is not None and not result_df.empty:
                 with st.expander("📊 查看詳細數據表"):
                     st.dataframe(result_df, hide_index=True, use_container_width=True)
             
-            # 更新紀錄
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": human_reply,
