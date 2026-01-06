@@ -4,6 +4,7 @@ import sqlite3
 from groq import Groq
 import os
 import datetime
+import time
 
 # ==========================================
 # 1. 企業級 UI 配置與 CSS 系統
@@ -319,9 +320,30 @@ with st.sidebar:
     st.markdown("---")
     
     # Navigation / Quick Actions (模擬企業選單)
-    st.markdown("**快速存取**")
-    st.button("📊 匯出銷售報表", use_container_width=True)
-    st.button("🔄 同步 ERP 數據", use_container_width=True)
+    st.markdown("---")
+    st.markdown("**快速存取 (Quick Actions)**")
+    
+    # 1. 實作「匯出報表」功能
+    # 先把資料轉成 CSV
+    csv = df_all.to_csv(index=False).encode('utf-8')
+    
+    st.download_button(
+        label="📊 匯出庫存報表 (CSV)",
+        data=csv,
+        file_name=f"inventory_report_{datetime.date.today()}.csv",
+        mime="text/csv",
+        use_container_width=True,
+        help="點擊下載目前的庫存清單"
+    )
+
+    # 2. 實作「同步 ERP」功能
+    if st.button("🔄 同步 ERP 數據", use_container_width=True):
+        with st.spinner("正在連接總部 ERP 系統..."):
+            time.sleep(1.5) # 假裝跑了 1.5 秒
+        
+        # 顯示成功訊息 (Toast Notification - 很像手機 App 的通知)
+        st.toast("✅ 數據同步完成！已更新至最新庫存。", icon="🎉")
+        st.balloons() # 放氣球慶祝一下 (演示時很有效果)
     
     st.markdown("---")
     # Mini Table for quick glance
