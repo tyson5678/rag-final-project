@@ -120,7 +120,7 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 # ==========================================
-# 3. 資料庫初始化 (60+ SKU)
+# 3. 資料庫初始化 (30+ SKU)
 # ==========================================
 @st.cache_resource
 def init_db():
@@ -294,10 +294,10 @@ with st.sidebar:
     st.markdown("---")
 
 # --- 主畫面 ---
-st.markdown("#### 👋 歡迎回到戰情室，店長。")
+st.markdown("#### 👋 歡迎使用智慧零售助理")
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "系統已連線。您可以查詢全店 60+ 項商品的即時庫存狀態。"}]
+    st.session_state.messages = [{"role": "assistant", "content": "系統已連線。您可以查詢全店 30+ 項商品的即時庫存狀態。"}]
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="👨‍💼" if msg["role"]=="user" else "🤖"):
