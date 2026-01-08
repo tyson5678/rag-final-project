@@ -49,7 +49,7 @@ st.markdown("""
         font-size: 1.5rem;
     }
 
-    /* ★ 關鍵 CSS 修改：同時統一下載按鈕 (.stDownloadButton) 與普通按鈕 (.stButton) 的風格 ★ */
+    /* ★ 關鍵 CSS：將側邊欄按鈕偽裝成指標卡片 ★ */
     section[data-testid="stSidebar"] .stButton button, 
     section[data-testid="stSidebar"] .stDownloadButton button {
         background-color: #ffffff;
@@ -60,13 +60,12 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         transition: all 0.2s ease;
         width: 100%;
-        border-left: 4px solid var(--primary-blue); /* 統一藍色裝飾條 */
+        border-left: 4px solid var(--primary-blue);
         color: #1e293b;
-        margin-bottom: 8px; /* 增加一點間距 */
+        margin-bottom: 8px;
         display: block;
     }
     
-    /* 滑鼠懸停特效 */
     section[data-testid="stSidebar"] .stButton button:hover,
     section[data-testid="stSidebar"] .stDownloadButton button:hover {
         background-color: #f8fafc;
@@ -76,7 +75,6 @@ st.markdown("""
         color: var(--primary-blue);
     }
     
-    /* 按鈕內的文字排版 */
     section[data-testid="stSidebar"] .stButton button p,
     section[data-testid="stSidebar"] .stDownloadButton button p {
         font-size: 1rem;
@@ -120,55 +118,70 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 # ==========================================
-# 3. 資料庫初始化 (30+ SKU)
+# 3. 資料庫初始化 (Boss Mode: 升級版 Schema)
 # ==========================================
 @st.cache_resource
 def init_db():
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     c = conn.cursor()
+    # 新增 cost, supplier, sales_7d 欄位
     c.execute('''
         CREATE TABLE products (
             sku TEXT PRIMARY KEY,
-            name TEXT, category TEXT, price INTEGER, stock INTEGER, status TEXT, last_restock DATE
+            name TEXT, 
+            category TEXT, 
+            price INTEGER, 
+            cost INTEGER, 
+            stock INTEGER, 
+            sales_7d INTEGER,
+            supplier TEXT,
+            status TEXT, 
+            last_restock DATE
         )
     ''')
     
+    # 模擬數據 (含成本與供應商)
     products_data = [
-        ("BEV-001", "可口可樂 600ml", "飲料", 35, 120, "正常", "2024-01-01"),
-        ("BEV-002", "原萃綠茶", "飲料", 25, 200, "正常", "2024-01-02"),
-        ("BEV-003", "瑞穗全脂鮮乳", "飲料", 92, 0, "缺貨", "2023-12-28"),
-        ("BEV-004", "貝納頌咖啡", "飲料", 35, 45, "正常", "2024-01-03"),
-        ("BEV-005", "舒跑運動飲料", "飲料", 25, 150, "正常", "2024-01-01"),
-        ("BEV-006", "OATLY燕麥奶", "飲料", 169, 12, "補貨中", "2023-12-30"),
-        ("BEV-007", "純喫茶紅茶", "飲料", 20, 80, "正常", "2024-01-04"),
-        ("BEV-008", "每朝健康綠茶", "飲料", 35, 60, "正常", "2024-01-02"),
-        ("BEV-009", "紅牛能量飲料", "飲料", 59, 200, "正常", "2024-01-01"),
-        ("BEV-010", "統一木瓜牛乳", "飲料", 35, 5, "補貨中", "2023-12-29"),
-        ("FRE-001", "御飯糰(鮪魚)", "鮮食", 35, 12, "正常", "2024-01-05"),
-        ("FRE-002", "所長茶葉蛋", "鮮食", 18, 0, "缺貨", "2024-01-04"),
-        ("FRE-003", "台灣香蕉(根)", "鮮食", 25, 5, "補貨中", "2024-01-03"),
-        ("FRE-004", "奮起湖便當", "鮮食", 89, 8, "正常", "2024-01-05"),
-        ("FRE-005", "即食雞胸肉", "鮮食", 59, 25, "正常", "2024-01-04"),
-        ("FRE-006", "大亨堡熱狗", "熟食", 35, 15, "正常", "2024-01-05"),
-        ("FRE-007", "關東煮(總合)", "熟食", 15, 0, "缺貨", "2024-01-04"),
-        ("FRE-008", "溫泉蛋", "鮮食", 25, 30, "正常", "2024-01-03"),
-        ("SNK-001", "樂事洋芋片(原味)", "零食", 45, 80, "正常", "2023-12-25"),
-        ("SNK-002", "義美小泡芙(巧克力)", "零食", 32, 100, "正常", "2023-12-20"),
-        ("SNK-003", "金莎巧克力(3入)", "零食", 42, 5, "補貨中", "2023-12-15"),
-        ("SNK-004", "科學麵", "零食", 12, 500, "正常", "2023-12-10"),
-        ("SNK-005", "萬歲牌綜合堅果", "零食", 150, 20, "正常", "2023-12-01"),
-        ("SNK-006", "北海鱈魚香絲", "零食", 50, 60, "正常", "2023-12-22"),
-        ("DAL-001", "舒潔衛生紙", "日用品", 129, 60, "正常", "2023-11-20"),
-        ("DAL-002", "金頂電池(3號)", "日用品", 159, 30, "正常", "2023-10-15"),
-        ("DAL-003", "輕便雨衣", "日用品", 49, 150, "正常", "2023-09-01"),
-        ("DAL-004", "醫療口罩(50入)", "日用品", 199, 100, "正常", "2023-12-01"),
-        ("ALC-001", "金牌台灣啤酒", "酒類", 45, 200, "正常", "2023-12-31"),
-        ("ALC-002", "海尼根", "酒類", 55, 180, "正常", "2023-12-30"),
-        ("ALC-003", "約翰走路黑牌", "酒類", 850, 3, "缺貨", "2023-11-15"),
-        ("TOB-001", "七星(中淡)", "香菸", 125, 300, "正常", "2024-01-01"),
-        ("TOB-002", "麥瑟(藍)", "香菸", 110, 20, "補貨中", "2023-12-28"),
+        ("BEV-001", "可口可樂 600ml", "飲料", 35, 20, 120, 50, "太古可樂", "正常", "2024-01-01"),
+        ("BEV-002", "原萃綠茶", "飲料", 25, 15, 200, 80, "太古可樂", "正常", "2024-01-02"),
+        ("BEV-003", "瑞穗全脂鮮乳", "飲料", 92, 75, 0, 12, "統一企業", "缺貨", "2023-12-28"),
+        ("BEV-004", "貝納頌咖啡", "飲料", 35, 22, 45, 15, "味全食品", "正常", "2024-01-03"),
+        ("BEV-005", "舒跑運動飲料", "飲料", 25, 16, 150, 40, "維他露", "正常", "2024-01-01"),
+        ("BEV-006", "OATLY燕麥奶", "飲料", 169, 130, 12, 5, "德記洋行", "補貨中", "2023-12-30"),
+        ("BEV-007", "純喫茶紅茶", "飲料", 20, 14, 80, 60, "統一企業", "正常", "2024-01-04"),
+        ("BEV-008", "每朝健康綠茶", "飲料", 35, 23, 60, 20, "維他露", "正常", "2024-01-02"),
+        ("BEV-009", "紅牛能量飲料", "飲料", 59, 40, 200, 10, "紅牛台灣", "正常", "2024-01-01"),
+        ("BEV-010", "統一木瓜牛乳", "飲料", 35, 25, 5, 25, "統一企業", "補貨中", "2023-12-29"),
+        
+        ("FRE-001", "御飯糰(鮪魚)", "鮮食", 35, 20, 12, 40, "統一超食", "正常", "2024-01-05"),
+        ("FRE-002", "所長茶葉蛋", "鮮食", 18, 10, 0, 150, "所長食品", "缺貨", "2024-01-04"),
+        ("FRE-003", "台灣香蕉(根)", "鮮食", 25, 12, 5, 30, "在地農會", "補貨中", "2024-01-03"),
+        ("FRE-004", "奮起湖便當", "鮮食", 89, 65, 8, 20, "統一超食", "正常", "2024-01-05"),
+        ("FRE-005", "即食雞胸肉", "鮮食", 59, 35, 25, 15, "大成食品", "正常", "2024-01-04"),
+        ("FRE-006", "大亨堡熱狗", "熟食", 35, 18, 15, 30, "統一超食", "正常", "2024-01-05"),
+        ("FRE-007", "關東煮(總合)", "熟食", 15, 8, 0, 50, "統一超食", "缺貨", "2024-01-04"),
+        ("FRE-008", "溫泉蛋", "鮮食", 25, 15, 30, 25, "石安牧場", "正常", "2024-01-03"),
+        
+        ("SNK-001", "樂事洋芋片", "零食", 45, 30, 80, 25, "百事食品", "正常", "2023-12-25"),
+        ("SNK-002", "義美小泡芙", "零食", 32, 22, 100, 45, "義美食品", "正常", "2023-12-20"),
+        ("SNK-003", "金莎巧克力", "零食", 42, 28, 5, 60, "費列羅", "補貨中", "2023-12-15"),
+        ("SNK-004", "科學麵", "零食", 12, 6, 500, 200, "統一企業", "正常", "2023-12-10"),
+        ("SNK-005", "萬歲牌綜合堅果", "零食", 150, 100, 20, 10, "聯華食品", "正常", "2023-12-01"),
+        ("SNK-006", "北海鱈魚香絲", "零食", 50, 35, 60, 15, "有豐食品", "正常", "2023-12-22"),
+        
+        ("DAL-001", "舒潔衛生紙", "日用品", 129, 90, 60, 20, "金百利", "正常", "2023-11-20"),
+        ("DAL-002", "金頂電池(3號)", "日用品", 159, 100, 30, 5, "金頂", "正常", "2023-10-15"),
+        ("DAL-003", "輕便雨衣", "日用品", 49, 20, 150, 50, "達新工業", "正常", "2023-09-01"),
+        ("DAL-004", "醫療口罩(50入)", "日用品", 199, 120, 100, 10, "中衛", "正常", "2023-12-01"),
+        
+        ("ALC-001", "金牌台灣啤酒", "酒類", 45, 30, 200, 60, "台灣菸酒", "正常", "2023-12-31"),
+        ("ALC-002", "海尼根", "酒類", 55, 38, 180, 50, "海尼根", "正常", "2023-12-30"),
+        ("ALC-003", "約翰走路黑牌", "酒類", 850, 600, 3, 2, "帝亞吉歐", "缺貨", "2023-11-15"),
+        ("ALC-004", "18天生啤", "酒類", 65, 45, 10, 30, "台灣菸酒", "補貨中", "2024-01-02"),
+        ("TOB-001", "七星(中淡)", "香菸", 125, 90, 300, 100, "杰太日煙", "正常", "2024-01-01"),
+        ("TOB-002", "麥瑟(藍)", "香菸", 110, 80, 20, 5, "帝國菸草", "補貨中", "2023-12-28"),
     ]
-    c.executemany('INSERT INTO products VALUES (?,?,?,?,?,?,?)', products_data)
+    c.executemany('INSERT INTO products VALUES (?,?,?,?,?,?,?,?,?,?)', products_data)
     conn.commit()
     return conn
 
@@ -179,7 +192,22 @@ conn = init_db()
 # ==========================================
 DB_SCHEMA = """
 Table: products
-Columns: sku, name, category, price, stock, status ('正常', '缺貨', '補貨中'), last_restock
+Columns: 
+- sku (商品編號)
+- name (商品名稱)
+- category (類別)
+- price (零售價)
+- cost (進貨成本)
+- stock (庫存量)
+- sales_7d (過去7天銷售量)
+- supplier (供應商名稱)
+- status ('正常', '缺貨', '補貨中')
+- last_restock (最後進貨日)
+
+Logic:
+1. Margin (毛利) = price - cost
+2. Inventory Value = cost * stock
+3. High Risk = stock < sales_7d (Inventory days < 7)
 """
 
 def generate_sql(query, error_msg=None):
@@ -223,17 +251,40 @@ def generate_human_response(user_query, df, error=None):
     if df is None or df.empty:
         data_context = "查詢結果：無資料。"
     else:
+        # 增加毛利計算給 AI 參考
+        if 'price' in df.columns and 'cost' in df.columns:
+            df['margin'] = df['price'] - df['cost']
         data_context = f"查詢結果 (前 10 筆):\n{df.head(10).to_string(index=False)}"
 
+    # 升級版 Prompt: 營運總監模式
     system_prompt = f"""
-    你是一位「企業零售數據分析師」。問題："{user_query}"。數據：{data_context}
-    準則：專業語氣、引用數據、若無資料則推薦同類別替代品。不使用 Markdown 表格。
+    【角色設定】
+    你是一位「資深零售營運總監」的 AI 特助。
+    你的對話對象是公司老闆，他關注「毛利」、「庫存周轉」、「資金積壓」與「供應鏈穩定」。
+
+    【當前任務】
+    根據數據：
+    {data_context}
+    
+    回答老闆的問題："{user_query}"
+
+    【回答準則 - Boss Mode】
+    1. **結論先行 (BLUF)**：第一句話直接講重點（例如：「目前有 3 項高毛利商品缺貨，預估損失...」）。
+    2. **財務視角**：
+       - 不只報庫存，要報「庫存金額」(Cost * Stock)。
+       - 提到商品時，若有數據，請順帶分析毛利 (Price - Cost)。
+    3. **行動建議 (Actionable Insights)**：
+       - 發現缺貨：請列出該商品的「供應商」並建議立即聯絡。
+       - 發現滯銷：建議促銷。
+       - 發現熱銷：發出斷貨預警。
+    4. **語氣**：專業、精煉、決策導向。不要用客服語氣。
+    5. **格式**：不使用 Markdown 表格，用條列式呈現。
     """
     try:
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[{"role": "system", "content": system_prompt}],
-            temperature=0.7, max_tokens=350
+            temperature=0.7, max_tokens=450
         )
         return completion.choices[0].message.content
     except:
@@ -255,29 +306,26 @@ with st.sidebar:
     
     c1, c2 = st.columns(2)
     with c1:
-        if st.button(f"📦 品項數量\n\n{len(df_all)}", key="card_sku", use_container_width=True):
+        if st.button(f"📦 總 SKU\n\n{len(df_all)}", key="card_sku", use_container_width=True):
             set_prompt("列出所有商品清單，並依照類別排序")
-            
     with c2:
         val = (df_all['price'] * df_all['stock']).sum()
         if st.button(f"💰 庫存總值\n\n${val/1000:.1f}K", key="card_val", use_container_width=True):
-            set_prompt("統計各類別的庫存總金額")
+            set_prompt("統計各類別的庫存總金額，並計算毛利")
 
     c3, c4 = st.columns(2)
     with c3:
          missing = len(df_all[df_all['status'] == '缺貨'])
          if st.button(f"🚨 缺貨品項\n\n{missing}", key="card_missing", use_container_width=True):
-             set_prompt("列出所有缺貨的商品")
-             
+             set_prompt("列出所有缺貨商品及其供應商")
     with c4:
          low = len(df_all[df_all['stock'] < 10])
          if st.button(f"⚠️ 低水位\n\n{low}", key="card_low", use_container_width=True):
-             set_prompt("列出庫存低於 10 的商品，並依照庫存量由少到多排序")
+             set_prompt("列出庫存低於 10 的商品與其 7 日銷量")
 
     st.markdown("---")
     st.markdown("**快速操作**")
     
-    # 這裡的樣式現在會跟上面的卡片一致（白底、藍邊）
     st.download_button(
         label="📊 匯出報表 (CSV)",
         data=df_all.to_csv(index=False).encode('utf-8'),
@@ -290,14 +338,13 @@ with st.sidebar:
         with st.spinner("Syncing..."):
             time.sleep(1)
         st.toast("✅ 同步完成！", icon="🎉")
-        
     st.markdown("---")
 
 # --- 主畫面 ---
-st.markdown("#### 👋 歡迎使用智慧零售助理")
+st.markdown("#### 👋 歡迎回到戰情室，老板。")
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "系統已連線。您可以查詢全店 30+ 項商品的即時庫存狀態。"}]
+    st.session_state.messages = [{"role": "assistant", "content": "系統已連線。所有營運數據皆已同步完成。"}]
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="👨‍💼" if msg["role"]=="user" else "🤖"):
@@ -310,18 +357,17 @@ for msg in st.session_state.messages:
                     st.bar_chart(msg["data"].set_index("name")["stock"], color="#0f4c81")
 
 # 快捷膠囊按鈕
-st.markdown("###### 💡 快速提問：")
+st.markdown("###### 💡 決策捷徑：")
 col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
 with col_chip1:
-    if st.button("🏆 庫存最多", use_container_width=True): set_prompt("庫存最多的前 10 名商品")
+    if st.button("🏆 銷量冠軍", use_container_width=True): set_prompt("列出近 7 日銷量最高的前 5 名商品")
 with col_chip2:
-    if st.button("🚨 缺貨清單", use_container_width=True): set_prompt("列出所有缺貨或補貨中的商品")
+    if st.button("🚨 斷貨預警", use_container_width=True): set_prompt("列出庫存小於 7 日銷量的危險商品")
 with col_chip3:
-    if st.button("💰 價值最高", use_container_width=True): set_prompt("依據單價從高到低列出所有商品")
+    if st.button("💰 高毛利商品", use_container_width=True): set_prompt("列出毛利 (Price-Cost) 最高的前 5 名")
 with col_chip4:
-    if st.button("🥤 飲料概況", use_container_width=True): set_prompt("統計飲料類別的完整明細")
+    if st.button("🚛 供應商檢視", use_container_width=True): set_prompt("統計各供應商的供貨品項數量")
 
-# 處理 Prompt 邏輯
 default_prompt = st.session_state.pop("prompt_input", "")
 
 if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or default_prompt:
@@ -333,6 +379,7 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
 
     with st.chat_message("assistant", avatar="🤖"):
         with st.spinner("AI 分析師正在處理數據..."):
+            
             sql = generate_sql(prompt)
             result = None
             error = None
@@ -364,7 +411,7 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
     if default_prompt:
         st.rerun()
 
-# --- 側邊欄 Part 2 (SQL Log) ---
+# --- 側邊欄 Part 2 (Audit Log) ---
 with st.sidebar:
     st.markdown("**🛠️ SQL 執行歷程**")
     log_container = st.container(height=250)
