@@ -49,7 +49,7 @@ st.markdown("""
         font-size: 1.5rem;
     }
 
-    /* ★ 關鍵 CSS：將側邊欄按鈕偽裝成指標卡片 ★ */
+    /* 側邊欄按鈕偽裝成指標卡片 */
     section[data-testid="stSidebar"] .stButton button, 
     section[data-testid="stSidebar"] .stDownloadButton button {
         background-color: #ffffff;
@@ -118,29 +118,20 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 # ==========================================
-# 3. 資料庫初始化 (Boss Mode: 升級版 Schema)
+# 3. 資料庫初始化
 # ==========================================
 @st.cache_resource
 def init_db():
     conn = sqlite3.connect(":memory:", check_same_thread=False)
     c = conn.cursor()
-    # 新增 cost, supplier, sales_7d 欄位
     c.execute('''
         CREATE TABLE products (
             sku TEXT PRIMARY KEY,
-            name TEXT, 
-            category TEXT, 
-            price INTEGER, 
-            cost INTEGER, 
-            stock INTEGER, 
-            sales_7d INTEGER,
-            supplier TEXT,
-            status TEXT, 
-            last_restock DATE
+            name TEXT, category TEXT, price INTEGER, cost INTEGER, stock INTEGER, 
+            sales_7d INTEGER, supplier TEXT, status TEXT, last_restock DATE
         )
     ''')
     
-    # 模擬數據 (含成本與供應商)
     products_data = [
         ("BEV-001", "可口可樂 600ml", "飲料", 35, 20, 120, 50, "太古可樂", "正常", "2024-01-01"),
         ("BEV-002", "原萃綠茶", "飲料", 25, 15, 200, 80, "太古可樂", "正常", "2024-01-02"),
@@ -152,7 +143,6 @@ def init_db():
         ("BEV-008", "每朝健康綠茶", "飲料", 35, 23, 60, 20, "維他露", "正常", "2024-01-02"),
         ("BEV-009", "紅牛能量飲料", "飲料", 59, 40, 200, 10, "紅牛台灣", "正常", "2024-01-01"),
         ("BEV-010", "統一木瓜牛乳", "飲料", 35, 25, 5, 25, "統一企業", "補貨中", "2023-12-29"),
-        
         ("FRE-001", "御飯糰(鮪魚)", "鮮食", 35, 20, 12, 40, "統一超食", "正常", "2024-01-05"),
         ("FRE-002", "所長茶葉蛋", "鮮食", 18, 10, 0, 150, "所長食品", "缺貨", "2024-01-04"),
         ("FRE-003", "台灣香蕉(根)", "鮮食", 25, 12, 5, 30, "在地農會", "補貨中", "2024-01-03"),
@@ -161,23 +151,19 @@ def init_db():
         ("FRE-006", "大亨堡熱狗", "熟食", 35, 18, 15, 30, "統一超食", "正常", "2024-01-05"),
         ("FRE-007", "關東煮(總合)", "熟食", 15, 8, 0, 50, "統一超食", "缺貨", "2024-01-04"),
         ("FRE-008", "溫泉蛋", "鮮食", 25, 15, 30, 25, "石安牧場", "正常", "2024-01-03"),
-        
         ("SNK-001", "樂事洋芋片", "零食", 45, 30, 80, 25, "百事食品", "正常", "2023-12-25"),
         ("SNK-002", "義美小泡芙", "零食", 32, 22, 100, 45, "義美食品", "正常", "2023-12-20"),
         ("SNK-003", "金莎巧克力", "零食", 42, 28, 5, 60, "費列羅", "補貨中", "2023-12-15"),
         ("SNK-004", "科學麵", "零食", 12, 6, 500, 200, "統一企業", "正常", "2023-12-10"),
         ("SNK-005", "萬歲牌綜合堅果", "零食", 150, 100, 20, 10, "聯華食品", "正常", "2023-12-01"),
         ("SNK-006", "北海鱈魚香絲", "零食", 50, 35, 60, 15, "有豐食品", "正常", "2023-12-22"),
-        
         ("DAL-001", "舒潔衛生紙", "日用品", 129, 90, 60, 20, "金百利", "正常", "2023-11-20"),
         ("DAL-002", "金頂電池(3號)", "日用品", 159, 100, 30, 5, "金頂", "正常", "2023-10-15"),
         ("DAL-003", "輕便雨衣", "日用品", 49, 20, 150, 50, "達新工業", "正常", "2023-09-01"),
         ("DAL-004", "醫療口罩(50入)", "日用品", 199, 120, 100, 10, "中衛", "正常", "2023-12-01"),
-        
         ("ALC-001", "金牌台灣啤酒", "酒類", 45, 30, 200, 60, "台灣菸酒", "正常", "2023-12-31"),
         ("ALC-002", "海尼根", "酒類", 55, 38, 180, 50, "海尼根", "正常", "2023-12-30"),
         ("ALC-003", "約翰走路黑牌", "酒類", 850, 600, 3, 2, "帝亞吉歐", "缺貨", "2023-11-15"),
-        ("ALC-004", "18天生啤", "酒類", 65, 45, 10, 30, "台灣菸酒", "補貨中", "2024-01-02"),
         ("TOB-001", "七星(中淡)", "香菸", 125, 90, 300, 100, "杰太日煙", "正常", "2024-01-01"),
         ("TOB-002", "麥瑟(藍)", "香菸", 110, 80, 20, 5, "帝國菸草", "補貨中", "2023-12-28"),
     ]
@@ -186,6 +172,21 @@ def init_db():
     return conn
 
 conn = init_db()
+
+# 🌟 定義欄位中英對照表 (UI 顯示用)
+COLUMN_MAPPING = {
+    "sku": "商品編號",
+    "name": "商品名稱",
+    "category": "類別",
+    "price": "單價",
+    "cost": "成本",
+    "stock": "庫存量",
+    "sales_7d": "近7日銷量",
+    "supplier": "供應商",
+    "status": "狀態",
+    "last_restock": "最後補貨日",
+    "margin": "毛利"
+}
 
 # ==========================================
 # 4. Agentic AI 核心
@@ -251,12 +252,14 @@ def generate_human_response(user_query, df, error=None):
     if df is None or df.empty:
         data_context = "查詢結果：無資料。"
     else:
-        # 增加毛利計算給 AI 參考
+        # 計算毛利並加入 DataFrame (尚未改名)
         if 'price' in df.columns and 'cost' in df.columns:
             df['margin'] = df['price'] - df['cost']
-        data_context = f"查詢結果 (前 10 筆):\n{df.head(10).to_string(index=False)}"
+        
+        # 🌟 關鍵：將數據表頭轉為中文再給 AI，這樣 AI 回答會更自然
+        df_display = df.rename(columns=COLUMN_MAPPING)
+        data_context = f"查詢結果 (前 10 筆):\n{df_display.head(10).to_string(index=False)}"
 
-    # 升級版 Prompt: 營運總監模式
     system_prompt = f"""
     【角色設定】
     你是一位「資深零售營運總監」的 AI 特助。
@@ -269,10 +272,10 @@ def generate_human_response(user_query, df, error=None):
     回答老闆的問題："{user_query}"
 
     【回答準則 - Boss Mode】
-    1. **結論先行 (BLUF)**：第一句話直接講重點（例如：「目前有 3 項高毛利商品缺貨，預估損失...」）。
+    1. **結論先行 (BLUF)**：第一句話直接講重點。
     2. **財務視角**：
-       - 不只報庫存，要報「庫存金額」(Cost * Stock)。
-       - 提到商品時，若有數據，請順帶分析毛利 (Price - Cost)。
+       - 不只報庫存，要報「庫存金額」。
+       - 提到商品時，若有數據，請順帶分析毛利。
     3. **行動建議 (Actionable Insights)**：
        - 發現缺貨：請列出該商品的「供應商」並建議立即聯絡。
        - 發現滯銷：建議促銷。
@@ -306,7 +309,7 @@ with st.sidebar:
     
     c1, c2 = st.columns(2)
     with c1:
-        if st.button(f"📦 總 SKU\n\n{len(df_all)}", key="card_sku", use_container_width=True):
+        if st.button(f"📦 總品項\n\n{len(df_all)}", key="card_sku", use_container_width=True):
             set_prompt("列出所有商品清單，並依照類別排序")
     with c2:
         val = (df_all['price'] * df_all['stock']).sum()
@@ -326,10 +329,12 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**快速操作**")
     
+    # 匯出時也轉成中文表頭
+    csv = df_all.rename(columns=COLUMN_MAPPING).to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📊 匯出報表 (CSV)",
-        data=df_all.to_csv(index=False).encode('utf-8'),
-        file_name=f"report.csv",
+        data=csv,
+        file_name=f"report_{datetime.date.today()}.csv",
         mime="text/csv",
         use_container_width=True
     )
@@ -344,17 +349,25 @@ with st.sidebar:
 st.markdown("#### 👋 歡迎回到戰情室，老板。")
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "系統已連線。所有營運數據皆已同步完成。"}]
+    st.session_state.messages = [{"role": "assistant", "content": "系統已連線。您可以查詢全店 60+ 項商品的即時庫存狀態。"}]
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar="👨‍💼" if msg["role"]=="user" else "🤖"):
         st.markdown(msg["content"])
         if "data" in msg and msg["data"] is not None and not msg["data"].empty:
             t1, t2 = st.tabs(["📄 數據表", "📈 圖表"])
-            with t1: st.dataframe(msg["data"], hide_index=True, use_container_width=True)
+            
+            # 🌟 這裡也要套用中文對照表
+            df_show = msg["data"].rename(columns=COLUMN_MAPPING)
+            
+            with t1: st.dataframe(df_show, hide_index=True, use_container_width=True)
             with t2: 
-                if len(msg["data"]) > 1 and "stock" in msg["data"].columns:
-                    st.bar_chart(msg["data"].set_index("name")["stock"], color="#0f4c81")
+                # 畫圖時需要用中文欄位名稱
+                chart_col_x = "商品名稱" if "商品名稱" in df_show.columns else df_show.columns[0]
+                chart_col_y = "庫存量" if "庫存量" in df_show.columns else (df_show.columns[1] if len(df_show.columns)>1 else None)
+                
+                if chart_col_y:
+                    st.bar_chart(df_show.set_index(chart_col_x)[chart_col_y], color="#0f4c81")
 
 # 快捷膠囊按鈕
 st.markdown("###### 💡 決策捷徑：")
@@ -403,10 +416,16 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
             
             if result is not None and not result.empty:
                 t1, t2 = st.tabs(["📄 數據表", "📈 圖表"])
-                with t1: st.dataframe(result, hide_index=True, use_container_width=True)
+                
+                # 🌟 即時回應的表格也要轉中文
+                df_show = result.rename(columns=COLUMN_MAPPING)
+                
+                with t1: st.dataframe(df_show, hide_index=True, use_container_width=True)
                 with t2: 
-                     if "stock" in result.columns:
-                        st.bar_chart(result.set_index("name")["stock"], color="#0f4c81")
+                     chart_col_x = "商品名稱" if "商品名稱" in df_show.columns else df_show.columns[0]
+                     chart_col_y = "庫存量" if "庫存量" in df_show.columns else (df_show.columns[1] if len(df_show.columns)>1 else None)
+                     if chart_col_y:
+                        st.bar_chart(df_show.set_index(chart_col_x)[chart_col_y], color="#0f4c81")
     
     if default_prompt:
         st.rerun()
