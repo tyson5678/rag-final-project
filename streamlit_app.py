@@ -16,9 +16,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ---------------------------------------------------------
-# [核彈級修正] CSS 強制淺色模式 V2
-# ---------------------------------------------------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
@@ -28,122 +25,82 @@ st.markdown("""
         --accent-orange: #f36f21;
         --background-light: #f8fafc;
         --border-color: #e2e8f0;
-        --text-dark: #334155;
-        --white: #ffffff;
     }
 
-    /* 1. 全域強制覆蓋：針對所有可能的容器 */
-    html, body, [class*="css"], [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    html, body, [class*="css"] {
         font-family: 'Inter', 'Noto Sans TC', sans-serif;
-        color: var(--text-dark) !important; 
-        background-color: var(--background-light) !important;
+        color: #334155;
+        background-color: var(--background-light);
     }
 
-    /* 2. 針對主應用程式區塊 (避免黑色背景滲透) */
-    .stApp {
-        background-color: var(--background-light) !important;
-        color: var(--text-dark) !important;
-    }
+    header {background: transparent !important; backdrop-filter: blur(0px);}
+    footer {display: none !important;}
+    #MainMenu {visibility: hidden;}
 
-    /* 3. 頂部導覽列 (Header) */
-    header[data-testid="stHeader"] {
-        background-color: rgba(255, 255, 255, 0.95) !important;
-        border-bottom: 1px solid var(--border-color);
-        box-shadow: none !important;
-    }
-    
-    /* 隱藏預設的漢堡選單與 Deploy 按鈕 (可選) */
-    /* .stAppHeader { display: none; } */
-
-    /* 4. 側邊欄強制白底 */
     [data-testid="stSidebar"] {
-        background-color: #ffffff !important;
+        background-color: #ffffff;
         border-right: 1px solid var(--border-color);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.02);
     }
     
-    /* 修正側邊欄內的文字顏色 */
-    [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, 
-    [data-testid="stSidebar"] span, [data-testid="stSidebar"] p, [data-testid="stSidebar"] label {
-        color: var(--text-dark) !important;
+    .sidebar-title {
+        color: var(--primary-blue);
+        font-weight: 800;
+        font-size: 1.5rem;
     }
 
-    /* 5. 關鍵修復：輸入框與 Chat Input (最常出現黑底白字的問題) */
-    .stTextInput input, .stTextArea textarea, .stSelectbox div, div[data-baseweb="select"] {
-        color: var(--text-dark) !important;
-        background-color: #ffffff !important;
-        border-color: var(--border-color) !important;
-    }
-    
-    /* 修正 Chat Input 的底部容器顏色 */
-    [data-testid="stBottom"] {
-        background-color: var(--background-light) !important;
-    }
-    
-    /* 修正 Chat Input 輸入框本體 */
-    [data-testid="stChatInput"] {
-        background-color: transparent !important;
-    }
-    
-    [data-testid="stChatInput"] textarea {
-        background-color: #ffffff !important;
-        color: var(--text-dark) !important;
-        border: 1px solid var(--border-color) !important;
-    }
-
-    /* 6. 按鈕樣式 (側邊欄) */
+    /* 側邊欄按鈕偽裝成指標卡片 */
     section[data-testid="stSidebar"] .stButton button, 
     section[data-testid="stSidebar"] .stDownloadButton button {
-        background-color: #ffffff !important;
-        border: 1px solid #e2e8f0 !important;
-        border-left: 4px solid var(--primary-blue) !important;
-        color: #1e293b !important;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px !important;
+        text-align: left !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: all 0.2s ease;
+        width: 100%;
+        border-left: 4px solid var(--primary-blue);
+        color: #1e293b;
+        margin-bottom: 8px;
+        display: block;
     }
     
     section[data-testid="stSidebar"] .stButton button:hover,
     section[data-testid="stSidebar"] .stDownloadButton button:hover {
-        background-color: #f1f5f9 !important;
-        color: var(--primary-blue) !important;
-    }
-
-    /* 7. 聊天訊息氣泡優化 */
-    .stChatMessage {
-        background-color: transparent !important;
+        background-color: #f8fafc;
+        border-color: var(--primary-blue);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(15, 76, 129, 0.1);
+        color: var(--primary-blue);
     }
     
-    /* AI 回覆 (淺灰/白底) */
+    section[data-testid="stSidebar"] .stButton button p,
+    section[data-testid="stSidebar"] .stDownloadButton button p {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    /* 聊天介面優化 */
+    .stChatMessage {padding: 1rem 0; background: transparent;}
     div[data-testid="stChatMessageContent"] {
-        background-color: #ffffff !important;
-        color: #1e293b !important;
+        background: #ffffff;
         border: 1px solid var(--border-color);
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border-radius: 0 16px 16px 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        color: #1e293b;
     }
-    
-    /* 用戶提問 (藍底白字 - 這裡需要保持白字，所以另外指定) */
     div[data-testid="stChatMessage"]:nth-child(odd) div[data-testid="stChatMessageContent"] {
-        background-color: var(--primary-blue) !important;
-        color: #ffffff !important;
+        background: var(--primary-blue);
+        color: white;
+        border: none;
+        border-radius: 16px 0 16px 16px;
+        box-shadow: 0 4px 12px rgba(15, 76, 129, 0.3);
     }
-    
-    /* 強制修正 Markdown 內的文字顏色 (避免深色模式下變成白色無法閱讀) */
-    .stMarkdown p {
-        color: inherit !important;
-    }
-    
-    /* 修正表格樣式 */
-    [data-testid="stDataFrame"] {
-        border: 1px solid var(--border-color);
-    }
-    
-    /* 隱藏 Footer */
-    footer {display: none !important;}
-    #MainMenu {visibility: hidden;}
-
 </style>
 """, unsafe_allow_html=True)
-# ---------------------------------------------------------
-# [修改區塊結束]
-# ---------------------------------------------------------
 
 # ==========================================
 # 2. API 初始化
@@ -155,15 +112,10 @@ elif os.getenv("GROQ_API_KEY"):
     api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
-    # 這裡改成 warning 以便預覽時不會直接報錯卡死，實際使用仍需 Key
-    st.warning("⚠️ 系統提示：未偵測到 API Key，AI 功能將無法使用。")
-    # 為了讓 UI 可以展示，我們先不 stop，但在調用時會檢查
-    # st.stop()
+    st.error("🚨 系統錯誤：未偵測到 API Key")
+    st.stop()
 
-# 為了防止沒有 Key 時報錯，給一個 dummy client (僅供 UI 測試)
-class DummyClient:
-    def chat(self, *args, **kwargs): return None
-client = Groq(api_key=api_key) if api_key else None
+client = Groq(api_key=api_key)
 
 # ==========================================
 # 3. 資料庫初始化
@@ -260,8 +212,6 @@ Logic:
 """
 
 def generate_sql(query, error_msg=None):
-    if not client: return None # 無 API Key 時跳過
-    
     instruction = ""
     if error_msg:
         instruction = f"\n⚠️ PREVIOUS SQL FAILED: {error_msg}. FIX IT."
@@ -297,8 +247,6 @@ def execute_sql_safe(sql, user_query):
         return None, str(e)
 
 def generate_human_response(user_query, df, error=None):
-    if not client: return "⚠️ 演示模式：請設定 API Key 以啟用 AI 分析功能。"
-    
     if error:
         return f"⚠️ 系統無法理解您的查詢。(Error: {error})"
     if df is None or df.empty:
