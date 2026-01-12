@@ -330,7 +330,7 @@ with st.sidebar:
     st.markdown("**快速操作**")
     
     # 匯出時也轉成中文表頭
-    csv = df_all.rename(columns=COLUMN_MAPPING).to_csv(index=False).encode('utf-8')
+    csv = df_all.rename(columns=COLUMN_MAPPING).to_csv(index=False).encode('utf-8-sig')
     st.download_button(
         label="📊 匯出報表 (CSV)",
         data=csv,
