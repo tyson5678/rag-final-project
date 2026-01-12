@@ -16,6 +16,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ---------------------------------------------------------
+# [修改區塊開始] CSS 樣式強制設定
+# ---------------------------------------------------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
@@ -27,18 +30,26 @@ st.markdown("""
         --border-color: #e2e8f0;
     }
 
+    /* 1. 強制覆蓋全域樣式，加上 !important */
     html, body, [class*="css"] {
         font-family: 'Inter', 'Noto Sans TC', sans-serif;
-        color: #334155;
-        background-color: var(--background-light);
+        color: #334155 !important; 
+        background-color: var(--background-light) !important;
+    }
+
+    /* 2. 特別指定 Streamlit 主應用程式容器為淺色，防止深色模式滲透 */
+    .stApp {
+        background-color: var(--background-light) !important;
+        color: #334155 !important;
     }
 
     header {background: transparent !important; backdrop-filter: blur(0px);}
     footer {display: none !important;}
     #MainMenu {visibility: hidden;}
 
+    /* 3. 確保側邊欄背景也是強制白色 */
     [data-testid="stSidebar"] {
-        background-color: #ffffff;
+        background-color: #ffffff !important;
         border-right: 1px solid var(--border-color);
         box-shadow: 4px 0 24px rgba(0,0,0,0.02);
     }
@@ -52,7 +63,7 @@ st.markdown("""
     /* 側邊欄按鈕偽裝成指標卡片 */
     section[data-testid="stSidebar"] .stButton button, 
     section[data-testid="stSidebar"] .stDownloadButton button {
-        background-color: #ffffff;
+        background-color: #ffffff !important; /* 強制按鈕背景白 */
         border: 1px solid #e2e8f0;
         border-radius: 12px;
         padding: 16px !important;
@@ -61,18 +72,18 @@ st.markdown("""
         transition: all 0.2s ease;
         width: 100%;
         border-left: 4px solid var(--primary-blue);
-        color: #1e293b;
+        color: #1e293b !important; /* 強制按鈕文字深色 */
         margin-bottom: 8px;
         display: block;
     }
     
     section[data-testid="stSidebar"] .stButton button:hover,
     section[data-testid="stSidebar"] .stDownloadButton button:hover {
-        background-color: #f8fafc;
+        background-color: #f8fafc !important;
         border-color: var(--primary-blue);
         transform: translateY(-2px);
         box-shadow: 0 6px 12px rgba(15, 76, 129, 0.1);
-        color: var(--primary-blue);
+        color: var(--primary-blue) !important;
     }
     
     section[data-testid="stSidebar"] .stButton button p,
@@ -84,23 +95,34 @@ st.markdown("""
 
     /* 聊天介面優化 */
     .stChatMessage {padding: 1rem 0; background: transparent;}
+    
+    /* 強制使用者與 AI 的對話框背景色 */
     div[data-testid="stChatMessageContent"] {
-        background: #ffffff;
+        background: #ffffff !important;
         border: 1px solid var(--border-color);
         border-radius: 0 16px 16px 16px;
         padding: 1.5rem;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-        color: #1e293b;
+        color: #1e293b !important;
     }
     div[data-testid="stChatMessage"]:nth-child(odd) div[data-testid="stChatMessageContent"] {
-        background: var(--primary-blue);
-        color: white;
+        background: var(--primary-blue) !important;
+        color: white !important;
         border: none;
         border-radius: 16px 0 16px 16px;
         box-shadow: 0 4px 12px rgba(15, 76, 129, 0.3);
     }
+
+    /* 強制輸入框樣式 (避免在深色模式下變黑) */
+    .stTextInput input {
+        color: #334155 !important;
+        background-color: #ffffff !important;
+    }
 </style>
 """, unsafe_allow_html=True)
+# ---------------------------------------------------------
+# [修改區塊結束]
+# ---------------------------------------------------------
 
 # ==========================================
 # 2. API 初始化
