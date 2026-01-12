@@ -16,31 +16,58 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# ---------------------------------------------------------
+# [重點修改] 智慧型適應主題 CSS
+# ---------------------------------------------------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap');
 
+    /* 1. 定義顏色變數：預設為【淺色模式】 */
     :root {
         --primary-blue: #0f4c81;
         --accent-orange: #f36f21;
-        --background-light: #f8fafc;
-        --border-color: #e2e8f0;
+        
+        --bg-main: #f8fafc;        /* 主背景：淺灰白 */
+        --bg-card: #ffffff;        /* 卡片/側邊欄背景：純白 */
+        --bg-hover: #f1f5f9;       /* 滑鼠懸停：淺灰 */
+        --text-main: #334155;      /* 主要文字：深灰 */
+        --text-sub: #64748b;       /* 次要文字：中灰 */
+        --border-color: #e2e8f0;   /* 邊框：淺灰 */
+        --shadow-color: rgba(0,0,0,0.05); /* 陰影 */
+        --code-bg: #f1f5f9;        /* 程式碼區塊背景 */
     }
 
-    html, body, [class*="css"] {
+    /* 2. 定義【深色模式】覆蓋變數 (當系統偵測到深色時自動套用) */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg-main: #0e1117;     /* Streamlit 原生深色背景 */
+            --bg-card: #262730;     /* 卡片背景：深灰 */
+            --bg-hover: #31333f;    /* 滑鼠懸停：稍亮灰 */
+            --text-main: #fafafa;   /* 主要文字：白 */
+            --text-sub: #9ca3af;    /* 次要文字：淺灰 */
+            --border-color: #41444e;/* 邊框：深灰 */
+            --shadow-color: rgba(0,0,0,0.4); /* 陰影加深 */
+            --code-bg: #1e2129;     /* 程式碼區塊背景 */
+        }
+    }
+
+    /* 3. 應用變數到各個元件 */
+    html, body, [class*="css"], .stApp {
         font-family: 'Inter', 'Noto Sans TC', sans-serif;
-        color: #334155;
-        background-color: var(--background-light);
+        color: var(--text-main) !important;
+        background-color: var(--bg-main) !important;
     }
 
     header {background: transparent !important; backdrop-filter: blur(0px);}
     footer {display: none !important;}
     #MainMenu {visibility: hidden;}
 
+    /* 側邊欄樣式 */
     [data-testid="stSidebar"] {
-        background-color: #ffffff;
+        background-color: var(--bg-card) !important;
         border-right: 1px solid var(--border-color);
-        box-shadow: 4px 0 24px rgba(0,0,0,0.02);
+        box-shadow: 4px 0 24px var(--shadow-color);
     }
     
     .sidebar-title {
@@ -52,27 +79,27 @@ st.markdown("""
     /* 側邊欄按鈕偽裝成指標卡片 */
     section[data-testid="stSidebar"] .stButton button, 
     section[data-testid="stSidebar"] .stDownloadButton button {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
+        background-color: var(--bg-card) !important;
+        border: 1px solid var(--border-color);
         border-radius: 12px;
         padding: 16px !important;
         text-align: left !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        box-shadow: 0 2px 4px var(--shadow-color);
         transition: all 0.2s ease;
         width: 100%;
         border-left: 4px solid var(--primary-blue);
-        color: #1e293b;
+        color: var(--text-main) !important;
         margin-bottom: 8px;
         display: block;
     }
     
     section[data-testid="stSidebar"] .stButton button:hover,
     section[data-testid="stSidebar"] .stDownloadButton button:hover {
-        background-color: #f8fafc;
+        background-color: var(--bg-hover) !important;
         border-color: var(--primary-blue);
         transform: translateY(-2px);
         box-shadow: 0 6px 12px rgba(15, 76, 129, 0.1);
-        color: var(--primary-blue);
+        color: var(--primary-blue) !important;
     }
     
     section[data-testid="stSidebar"] .stButton button p,
@@ -80,27 +107,62 @@ st.markdown("""
         font-size: 1rem;
         font-weight: 600;
         margin-bottom: 4px;
+        color: inherit !important;
     }
 
     /* 聊天介面優化 */
     .stChatMessage {padding: 1rem 0; background: transparent;}
+    
+    /* AI 回覆框 (使用變數) */
     div[data-testid="stChatMessageContent"] {
-        background: #ffffff;
+        background-color: var(--bg-card) !important;
         border: 1px solid var(--border-color);
         border-radius: 0 16px 16px 16px;
         padding: 1.5rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-        color: #1e293b;
+        box-shadow: 0 4px 6px -1px var(--shadow-color);
+        color: var(--text-main) !important;
     }
+    
+    /* 使用者提問框 (維持藍色，但確保文字是白色) */
     div[data-testid="stChatMessage"]:nth-child(odd) div[data-testid="stChatMessageContent"] {
-        background: var(--primary-blue);
-        color: white;
+        background-color: var(--primary-blue) !important;
+        color: #ffffff !important; /* 強制白字 */
         border: none;
         border-radius: 16px 0 16px 16px;
         box-shadow: 0 4px 12px rgba(15, 76, 129, 0.3);
     }
+    
+    /* 修正輸入框在深色模式下的顯示 */
+    .stTextInput input, .stTextArea textarea {
+        background-color: var(--bg-card) !important;
+        color: var(--text-main) !important;
+        border-color: var(--border-color) !important;
+    }
+
+    /* 修正表格文字顏色 */
+    [data-testid="stDataFrame"] {
+        color: var(--text-main) !important;
+    }
+    
+    /* 修正 SQL Log 容器 */
+    .sql-log-box {
+        background-color: var(--code-bg) !important;
+        padding: 8px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        border-left: 3px solid var(--accent-orange);
+    }
+    
+    .sql-log-title {
+        font-size: 0.75rem; 
+        color: var(--text-sub) !important; 
+        margin-bottom: 4px;
+    }
 </style>
 """, unsafe_allow_html=True)
+# ---------------------------------------------------------
+# [CSS 修改結束]
+# ---------------------------------------------------------
 
 # ==========================================
 # 2. API 初始化
@@ -112,10 +174,10 @@ elif os.getenv("GROQ_API_KEY"):
     api_key = os.getenv("GROQ_API_KEY")
 
 if not api_key:
-    st.error("🚨 系統錯誤：未偵測到 API Key")
-    st.stop()
+    # 這裡使用 warning 而非 error，方便預覽
+    st.warning("⚠️ 系統提示：未偵測到 API Key，AI 功能將受限。")
 
-client = Groq(api_key=api_key)
+client = Groq(api_key=api_key) if api_key else None
 
 # ==========================================
 # 3. 資料庫初始化
@@ -212,6 +274,7 @@ Logic:
 """
 
 def generate_sql(query, error_msg=None):
+    if not client: return None
     instruction = ""
     if error_msg:
         instruction = f"\n⚠️ PREVIOUS SQL FAILED: {error_msg}. FIX IT."
@@ -247,16 +310,16 @@ def execute_sql_safe(sql, user_query):
         return None, str(e)
 
 def generate_human_response(user_query, df, error=None):
+    if not client: return "⚠️ 演示模式：請設定 API Key 以啟用 AI 分析功能。"
+    
     if error:
         return f"⚠️ 系統無法理解您的查詢。(Error: {error})"
     if df is None or df.empty:
         data_context = "查詢結果：無資料。"
     else:
-        # 計算毛利並加入 DataFrame (尚未改名)
         if 'price' in df.columns and 'cost' in df.columns:
             df['margin'] = df['price'] - df['cost']
         
-        # 🌟 關鍵：將數據表頭轉為中文再給 AI，這樣 AI 回答會更自然
         df_display = df.rename(columns=COLUMN_MAPPING)
         data_context = f"查詢結果 (前 10 筆):\n{df_display.head(10).to_string(index=False)}"
 
@@ -329,7 +392,6 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**快速操作**")
     
-    # 匯出時也轉成中文表頭
     csv = df_all.rename(columns=COLUMN_MAPPING).to_csv(index=False).encode('utf-8-sig')
     st.download_button(
         label="📊 匯出報表 (CSV)",
@@ -357,19 +419,16 @@ for msg in st.session_state.messages:
         if "data" in msg and msg["data"] is not None and not msg["data"].empty:
             t1, t2 = st.tabs(["📄 數據表", "📈 圖表"])
             
-            # 🌟 這裡也要套用中文對照表
             df_show = msg["data"].rename(columns=COLUMN_MAPPING)
             
             with t1: st.dataframe(df_show, hide_index=True, use_container_width=True)
             with t2: 
-                # 畫圖時需要用中文欄位名稱
                 chart_col_x = "商品名稱" if "商品名稱" in df_show.columns else df_show.columns[0]
                 chart_col_y = "庫存量" if "庫存量" in df_show.columns else (df_show.columns[1] if len(df_show.columns)>1 else None)
                 
                 if chart_col_y:
                     st.bar_chart(df_show.set_index(chart_col_x)[chart_col_y], color="#0f4c81")
 
-# 快捷膠囊按鈕
 st.markdown("###### 💡 決策捷徑：")
 col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
 with col_chip1:
@@ -416,10 +475,7 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
             
             if result is not None and not result.empty:
                 t1, t2 = st.tabs(["📄 數據表", "📈 圖表"])
-                
-                # 🌟 即時回應的表格也要轉中文
                 df_show = result.rename(columns=COLUMN_MAPPING)
-                
                 with t1: st.dataframe(df_show, hide_index=True, use_container_width=True)
                 with t2: 
                      chart_col_x = "商品名稱" if "商品名稱" in df_show.columns else df_show.columns[0]
@@ -441,9 +497,10 @@ with st.sidebar:
                 st.info("尚無執行紀錄")
             else:
                 for log in reversed(sql_logs):
+                    # 使用 CSS Class 來應用變數顏色
                     st.markdown(f"""
-                    <div style="background:#f1f5f9; padding:8px; border-radius:6px; margin-bottom:8px; border-left:3px solid #f36f21;">
-                        <div style="font-size:0.75rem; color:#64748b; margin-bottom:4px;">SQL Logic</div>
+                    <div class="sql-log-box">
+                        <div class="sql-log-title">SQL Logic</div>
                         <code style="font-size:0.7rem; color:#0f4c81;">{log['sql']}</code>
                     </div>
                     """, unsafe_allow_html=True)
