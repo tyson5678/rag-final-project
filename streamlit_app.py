@@ -423,11 +423,25 @@ for msg in st.session_state.messages:
             
             with t1: st.dataframe(df_show, hide_index=True, use_container_width=True)
             with t2: 
+                # [Fix] 繪圖邏輯修復：改用 st.bar_chart(df, x=..., y=...) 避免 KeyError
                 chart_col_x = "商品名稱" if "商品名稱" in df_show.columns else df_show.columns[0]
-                chart_col_y = "庫存量" if "庫存量" in df_show.columns else (df_show.columns[1] if len(df_show.columns)>1 else None)
+                
+                # 尋找合適的 Y 軸，避開 X 軸欄位
+                possible_y = [c for c in df_show.columns if c != chart_col_x]
+                chart_col_y = None
+                
+                # 優先順序：庫存量 > sales_7d > 第一個可用數值欄位
+                if "庫存量" in possible_y:
+                    chart_col_y = "庫存量"
+                elif "sales_7d" in possible_y:
+                    chart_col_y = "sales_7d"
+                elif "近7日銷量" in possible_y:
+                    chart_col_y = "近7日銷量"
+                elif len(possible_y) > 0:
+                    chart_col_y = possible_y[0]
                 
                 if chart_col_y:
-                    st.bar_chart(df_show.set_index(chart_col_x)[chart_col_y], color="#0f4c81")
+                    st.bar_chart(df_show, x=chart_col_x, y=chart_col_y, color="#0f4c81")
 
 st.markdown("###### 💡 決策捷徑：")
 col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
@@ -478,10 +492,23 @@ if prompt := st.chat_input("請輸入查詢指令...", key="chat_input") or defa
                 df_show = result.rename(columns=COLUMN_MAPPING)
                 with t1: st.dataframe(df_show, hide_index=True, use_container_width=True)
                 with t2: 
+                     # [Fix] 繪圖邏輯修復：同上
                      chart_col_x = "商品名稱" if "商品名稱" in df_show.columns else df_show.columns[0]
-                     chart_col_y = "庫存量" if "庫存量" in df_show.columns else (df_show.columns[1] if len(df_show.columns)>1 else None)
+                     
+                     possible_y = [c for c in df_show.columns if c != chart_col_x]
+                     chart_col_y = None
+                     
+                     if "庫存量" in possible_y:
+                        chart_col_y = "庫存量"
+                     elif "sales_7d" in possible_y:
+                        chart_col_y = "sales_7d"
+                     elif "近7日銷量" in possible_y:
+                        chart_col_y = "近7日銷量"
+                     elif len(possible_y) > 0:
+                        chart_col_y = possible_y[0]
+                     
                      if chart_col_y:
-                        st.bar_chart(df_show.set_index(chart_col_x)[chart_col_y], color="#0f4c81")
+                        st.bar_chart(df_show, x=chart_col_x, y=chart_col_y, color="#0f4c81")
     
     if default_prompt:
         st.rerun()
